@@ -5,20 +5,20 @@ import 'package:generate_tree/treeNode.dart';
 import 'package:my_flutter_app/models/pub_var.dart';
 
 class AddProductModel {
-  // ── Form data
+  // Form data
   String name = '';
   String sku = '';
   double price = 0.0;
   int stockQuantity = 0;
   String description = '';
 
-  // ── Images
+  // Images
   Uint8List? mainImageBytes;
   List<Uint8List> subImageBytes = [];
   String? mainImageBase64;
   List<String> subImagesBase64 = [];
 
-  // ── Categories
+  // Categories
   List<TreeNode> treeListData = [];
   List<Map<String, dynamic>> checkedList = [];
   List<int> selectedCategoryIds = [];
@@ -26,7 +26,6 @@ class AddProductModel {
 
   AddProductModel();
 
-  // ── Reset form
   void reset() {
     name = '';
     sku = '';
@@ -41,7 +40,6 @@ class AddProductModel {
     selectedCategoryIds.clear();
   }
 
-  // ── Remove sub image
   void removeSubImage(int index) {
     if (index >= 0 && index < subImageBytes.length) {
       subImageBytes.removeAt(index);
@@ -49,7 +47,6 @@ class AddProductModel {
     }
   }
 
-  // ── Load categories from API
   Future<void> loadCategories() async {
     final res = await http.get(Uri.parse("${apiBase}get_categories.php"));
     if (res.statusCode == 200) {
@@ -60,7 +57,6 @@ class AddProductModel {
     }
   }
 
-  // ── Flatten nested categories for tree view
   List<TreeNode> flattenCategories(
     List<dynamic> cats, {
     int parentId = 0,
@@ -76,9 +72,11 @@ class AddProductModel {
       final node = TreeNode(
         id: id,
         title: title,
-        children: subs.isNotEmpty ? flattenCategories(subs, parentId: id, depth: depth + 1) : [],
+        children: subs.isNotEmpty
+            ? flattenCategories(subs, parentId: id, depth: depth + 1)
+            : [],
         checked: false,
-        show: depth == 0, // Show parents, hide children initially
+        show: depth == 0,
         pid: parentId,
         commonID: 0,
       );
@@ -87,7 +85,6 @@ class AddProductModel {
     return out;
   }
 
-  // ── Add category via API
   Future<void> addCategory(String name, [int parentId = 0]) async {
     final res = await http.post(
       Uri.parse("${apiBase}add_category.php"),
@@ -100,7 +97,6 @@ class AddProductModel {
     }
   }
 
-  // ── Edit category via API
   Future<void> editCategory(int id, String name) async {
     final res = await http.post(
       Uri.parse("${apiBase}edit_category.php"),
@@ -111,25 +107,5 @@ class AddProductModel {
     if (data["success"] != true) {
       throw Exception(data['message'] ?? "Failed to edit category");
     }
-  }
-
-  // ── Save product via API
-  Future<Map<String, dynamic>> saveProduct() async {
-    final res = await http.post(
-      Uri.parse("${apiBase}add_product.php"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "name": name,
-        "sku": sku,
-        "price": price,
-        "stock_quantity": stockQuantity,
-        "category_ids": selectedCategoryIds,
-        "description": description,
-        "image_path": mainImageBase64 ?? "",
-        "images": subImagesBase64,
-      }),
-    );
-    final data = jsonDecode(res.body);
-    return data;
   }
 }

@@ -36,15 +36,14 @@ $images_json = json_decode($product['images_json'], true) ?? [];
 $main_image = null;
 $sub_images = [];
 
-foreach ($images_json as $img) {
-    if (!empty($img['src'])) {
-        $src = $img['src'];
-        if (strpos($src, 'http') !== 0) {
-            $src = $baseImageUrl . $src;
-        }
-        if (!empty($img['is_main'])) {
-            $main_image = $src;
-        } else {
+// images_json is stored as array of strings (filenames)
+if (is_array($images_json)) {
+    foreach ($images_json as $filename) {
+        if (!empty($filename)) {
+            $src = $filename;
+            if (strpos($src, 'http') !== 0) {
+                $src = $baseImageUrl . $src;
+            }
             $sub_images[] = $src;
         }
     }

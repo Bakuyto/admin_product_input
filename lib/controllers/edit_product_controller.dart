@@ -147,46 +147,24 @@ class EditProductController extends ChangeNotifier {
       }
     }
 
-    final baseUrl = "${apiBase}picture/";
-    final mainPath = p['image_path'] ?? '';
-    if (mainPath.isNotEmpty) {
-      final bytes = await _downloadImage('$baseUrl$mainPath');
+    // Use the full URLs returned by the API for main and sub images
+    final mainImageUrl = p['main_image'];
+    if (mainImageUrl != null && mainImageUrl.isNotEmpty) {
+      final bytes = await _downloadImage(mainImageUrl);
       model.mainImageBase64 = base64Encode(bytes);
       model.mainImageBytes = bytes;
     }
 
-    // images_json may be null, an array, or a JSON string
-    try {
-      final imagesRaw = p['images_json'];
-      List<dynamic> subs = [];
-      if (imagesRaw == null) {
-        subs = [];
-      } else if (imagesRaw is String) {
-        if (imagesRaw.trim().isEmpty)
-          subs = [];
-        else
-          subs = jsonDecode(imagesRaw) as List<dynamic>;
-      } else if (imagesRaw is List) {
-        subs = imagesRaw;
-      } else {
-        // fallback: try decode its string representation
-        subs = jsonDecode(imagesRaw.toString()) as List<dynamic>;
-      }
-
-      for (final dynamic pathRaw in subs) {
-        final path = pathRaw?.toString() ?? '';
-        if (path.isEmpty) continue;
-        final bytes = await _downloadImage('$baseUrl$path');
+    final subImages = p['sub_images'] as List<dynamic>? ?? [];
+    for (final url in subImages) {
+      if (url != null && url.isNotEmpty) {
+        final bytes = await _downloadImage(url);
         model.subImagesBase64.add(base64Encode(bytes));
         model.subImageBytes.add(bytes);
       }
-    } catch (_) {
-      // if parsing or download fails, ignore additional images but continue
     }
 
     // Removed syncing here — syncing happens after categories are loaded in init().
-
-
   }
 
   Future<Uint8List> _downloadImage(String url) async {
@@ -283,8 +261,6 @@ class EditProductController extends ChangeNotifier {
     notifyListeners();
   }
 
-
-
   void updateCheckedCategories(TreeNode node, bool isChecked, int commonID) {
     // Update the node's checked status
     node.checked = isChecked;
@@ -296,7 +272,9 @@ class EditProductController extends ChangeNotifier {
 
     // Update model's checkedList and selectedCategoryIds
     model.checkedList = _getCheckedNodes(treeListData);
-    model.selectedCategoryIds = model.checkedList.map((e) => e['id'] as int).toList();
+    model.selectedCategoryIds = model.checkedList
+        .map((e) => e['id'] as int)
+        .toList();
 
     notifyListeners();
   }
@@ -307,8 +285,6 @@ class EditProductController extends ChangeNotifier {
       _setCheckedRecursiveBool(child, checked);
     }
   }
-
-
 
   // ── CATEGORY DIALOGS ──
   void openAddCategoryDialog(BuildContext context, {int parentId = 0}) {

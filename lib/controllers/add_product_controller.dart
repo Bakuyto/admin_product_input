@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:html_editor_enhanced/html_editor.dart';
-import 'package:camera/camera.dart';
+
 import 'package:generate_tree/treeNode.dart';
 import 'package:my_flutter_app/models/add_product_model.dart';
 import 'package:my_flutter_app/models/pub_var.dart';
@@ -19,11 +19,6 @@ class AddProductController extends ChangeNotifier {
   final TextEditingController stockController = TextEditingController();
   final HtmlEditorController htmlController = HtmlEditorController();
 
-
-  CameraController? cameraController;
-  List<CameraDescription> cameras = [];
-  bool isCameraInitialized = false;
-
   AddProductModel get model => _model;
 
   void init() {
@@ -31,31 +26,13 @@ class AddProductController extends ChangeNotifier {
     _setupListeners();
   }
 
-  Future<void> initializeCamera() async {
-    if (isCameraInitialized) return;
-    try {
-      cameras = await availableCameras();
-      if (cameras.isNotEmpty) {
-        cameraController = CameraController(
-          cameras.first,
-          ResolutionPreset.medium,
-          enableAudio: false,
-        );
-        await cameraController!.initialize();
-        isCameraInitialized = true;
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Camera initialization error: $e');
-    }
-  }
-
   void _setupListeners() {
     nameController.addListener(() => _model.name = nameController.text);
     skuController.addListener(() => _model.sku = skuController.text);
-    priceController.addListener(
-      () => _model.price = double.tryParse(priceController.text) ?? 0.0,
-    );
+    priceController.addListener(() {
+      double parsed = double.tryParse(priceController.text) ?? 0.0;
+      _model.price = parsed.isFinite ? parsed : 0.0;
+    });
     stockController.addListener(
       () => _model.stockQuantity = int.tryParse(stockController.text) ?? 0,
     );
@@ -75,15 +52,16 @@ class AddProductController extends ChangeNotifier {
   // CATEGORY OPERATIONS
   // ────────────────────────────────────────────────
   Future<void> loadCategories() async {
-    model.loadingCategories = true;
+    _model.loadingCategories = true;
     notifyListeners();
+
     try {
       await _model.loadCategories();
     } catch (e) {
       debugPrint('Load categories error: $e');
       rethrow;
     } finally {
-      model.loadingCategories = false;
+      _model.loadingCategories = false;
       notifyListeners();
     }
   }
@@ -113,48 +91,30 @@ class AddProductController extends ChangeNotifier {
       int id = (checkedNode['id'] as num).toInt();
       selectedIds.add(id);
 
-      // Add all ancestor IDs
-      TreeNode? currentNode = _model.treeListData.expand((n) => [n, ...n.children]).firstWhere(
-        (n) => n.id == id,
-        orElse: () => TreeNode(id: -1, title: '', children: [], checked: false, show: true, pid: 0, commonID: 0),
-      );
-      while (currentNode != null && currentNode.id != -1) {
-        // Assuming parentId is not directly available, we might need to adjust this logic
-        // For now, skip ancestor addition as TreeNode doesn't have parentId
-        break;
+      TreeNode? current = _findNode(_model.treeListData, id);
+      while (current != null && current.pid != 0) {
+        selectedIds.add(current.pid);
+        current = _findNode(_model.treeListData, current.pid);
       }
     }
 
-    _model.selectedCategoryIds = selectedIds.toList();
+    _model.selectedCategoryIds = selectedIds.toList()..sort();
     notifyListeners();
   }
 
-
-
-  // ────────────────────────────────────────────────
-  // IMAGE PICKING (Gallery + Camera)
-  // ────────────────────────────────────────────────
-  Future<void> pickMainImage({required bool fromCamera}) async {
-    if (fromCamera && isCameraInitialized && cameraController != null) {
-      // Use camera package for live preview
-      try {
-        final XFile image = await cameraController!.takePicture();
-        final bytes = await image.readAsBytes();
-        _model.mainImageBytes = bytes;
-        _model.mainImageBase64 = base64Encode(bytes);
-        notifyListeners();
-      } catch (e) {
-        debugPrint('Camera capture error: $e');
-        // Fallback to image picker
-        await _pickImageWithPicker(fromCamera: true);
-      }
-    } else {
-      // Use image picker for gallery or fallback
-      await _pickImageWithPicker(fromCamera: fromCamera);
+  TreeNode? _findNode(List<TreeNode> nodes, int id) {
+    for (final n in nodes) {
+      if (n.id == id) return n;
+      final found = _findNode(n.children, id);
+      if (found != null) return found;
     }
+    return null;
   }
 
-  Future<void> _pickImageWithPicker({required bool fromCamera}) async {
+  // ────────────────────────────────────────────────
+  // IMAGE PICKING
+  // ────────────────────────────────────────────────
+  Future<void> pickMainImage({required bool fromCamera}) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: fromCamera ? ImageSource.camera : ImageSource.gallery,
@@ -172,9 +132,11 @@ class AddProductController extends ChangeNotifier {
 
   Future<void> pickSubImages({required bool fromCamera}) async {
     final picker = ImagePicker();
-
     if (fromCamera) {
-      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
       if (photo != null) {
         final bytes = await photo.readAsBytes();
         _model.subImageBytes.add(bytes);
@@ -182,8 +144,8 @@ class AddProductController extends ChangeNotifier {
         notifyListeners();
       }
     } else {
-      final pickedList = await picker.pickMultiImage();
-      for (final img in pickedList) {
+      final list = await picker.pickMultiImage(imageQuality: 85);
+      for (final img in list) {
         final bytes = await img.readAsBytes();
         _model.subImageBytes.add(bytes);
         _model.subImagesBase64.add(base64Encode(bytes));
@@ -198,50 +160,41 @@ class AddProductController extends ChangeNotifier {
   }
 
   // ────────────────────────────────────────────────
-  // CATEGORY DIALOGS
+  // DIALOGS
   // ────────────────────────────────────────────────
   void openAddCategoryDialog(BuildContext context, {int parentId = 0}) {
-    final textController = TextEditingController();
-
+    final ctrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            parentId == 0 ? 'Add Main Category' : 'Add Subcategory',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: textController,
-            autofocus: true,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Category Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: textController.text.trim().isEmpty
-                  ? null
-                  : () async {
-                      final name = textController.text.trim();
-                      Navigator.pop(context);
-                      await addCategory(name, parentId);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text("Added: $name")));
-                      }
-                    },
-              child: const Text('Add'),
-            ),
-          ],
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(parentId == 0 ? 'Add Main Category' : 'Add Subcategory'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Name'),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: ctrl.text.trim().isEmpty
+                ? null
+                : () async {
+                    final name = ctrl.text.trim();
+                    Navigator.pop(context);
+                    await addCategory(name, parentId);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Added: $name')));
+                    }
+                  },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }
@@ -251,80 +204,89 @@ class AddProductController extends ChangeNotifier {
     required int id,
     required String currentName,
   }) {
-    final textController = TextEditingController(text: currentName);
-
+    final ctrl = TextEditingController(text: currentName);
     showDialog(
       context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Edit Category',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: textController,
-            autofocus: true,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Category Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: textController.text.trim().isEmpty
-                  ? null
-                  : () async {
-                      final newName = textController.text.trim();
-                      Navigator.pop(context);
-                      await editCategory(id, newName);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Updated: $newName")),
-                        );
-                      }
-                    },
-              child: const Text('Update'),
-            ),
-          ],
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit Category'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Name'),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: ctrl.text.trim().isEmpty
+                ? null
+                : () async {
+                    final name = ctrl.text.trim();
+                    Navigator.pop(context);
+                    await editCategory(id, name);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Updated: $name')));
+                    }
+                  },
+            child: const Text('Update'),
+          ),
+        ],
       ),
     );
   }
 
   // ────────────────────────────────────────────────
-  // SAVE PRODUCT
+  // SAVE PRODUCT – FULLY WORKING
   // ────────────────────────────────────────────────
   Future<void> saveProduct(BuildContext context) async {
     if (!formKey.currentState!.validate()) {
-      _showSnack(context, 'Please fill in required fields.', error: true);
+      _showSnack(context, 'Fill all required fields.', error: true);
       return;
     }
 
-    final descHtml = await htmlController.getText();
-    _model.description = descHtml;
+    final desc = (await htmlController.getText())?.trim() ?? '';
+    if (desc.isEmpty) {
+      _showSnack(context, 'Description is required.', error: true);
+      return;
+    }
 
     if (_model.mainImageBytes == null) {
       _showSnack(context, 'Main image is required.', error: true);
       return;
     }
 
-    final uri = Uri.parse("${apiBase}add_product.php");
-    final request = http.MultipartRequest('POST', uri);
+    if (_model.selectedCategoryIds.isEmpty) {
+      _showSnack(context, 'Select at least one category.', error: true);
+      return;
+    }
 
-    request.fields['data'] = jsonEncode({
-      "name": _model.name,
-      "sku": _model.sku,
+    // ── Build JSON string (exact same structure PHP expects)
+    final dataMap = {
+      "name": _model.name.trim(),
+      "sku": _model.sku.trim(),
       "price": _model.price,
       "stock_quantity": _model.stockQuantity,
       "category_ids": _model.selectedCategoryIds,
-      "description": _model.description,
-    });
+      "description": desc,
+    };
+    final jsonString = jsonEncode(dataMap);
+    debugPrint('Sending JSON: $jsonString');
 
+    // ── Multipart request
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse("${apiBase}add_product.php"),
+    );
+
+    // 1. JSON goes in a normal POST field called **data**
+    request.fields['data'] = jsonString;
+
+    // 2. Main image
     request.files.add(
       http.MultipartFile.fromBytes(
         'main_image',
@@ -333,6 +295,7 @@ class AddProductController extends ChangeNotifier {
       ),
     );
 
+    // 3. Sub-images (optional)
     for (int i = 0; i < _model.subImageBytes.length; i++) {
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -343,23 +306,22 @@ class AddProductController extends ChangeNotifier {
       );
     }
 
+    // ── Send
     try {
       final streamed = await request.send();
       final resp = await http.Response.fromStream(streamed);
-      final Map<String, dynamic> jsonResp = jsonDecode(resp.body);
+      debugPrint('Response: ${resp.body}');
 
+      final jsonResp = jsonDecode(resp.body);
       if (jsonResp['success'] == true) {
-        _showSnack(
-          context,
-          jsonResp['message'] ?? 'Product saved!',
-          error: false,
-        );
+        _showSnack(context, jsonResp['message'] ?? 'Saved!', error: false);
         _resetForm();
         if (Navigator.canPop(context)) Navigator.pop(context, true);
       } else {
-        throw jsonResp['message'] ?? 'Unknown error';
+        throw jsonResp['message'] ?? 'Failed';
       }
     } catch (e) {
+      debugPrint('Upload error: $e');
       _showSnack(context, 'Failed: $e', error: true);
     }
   }

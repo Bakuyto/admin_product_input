@@ -47,7 +47,6 @@ class _AddProductView extends StatefulWidget {
 }
 
 class _AddProductViewState extends State<_AddProductView> {
-
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AddProductController>();
@@ -358,7 +357,12 @@ class _AddProductViewState extends State<_AddProductView> {
                   padding: const EdgeInsets.all(8.0),
                   child: GenerateTree(
                     data: controller.model.treeListData,
-                    onChecked: (TreeNode node, bool isChecked, int commonID) => controller.updateCheckedCategories(node, isChecked, commonID),
+                    onChecked: (TreeNode node, bool isChecked, int commonID) =>
+                        controller.updateCheckedCategories(
+                          node,
+                          isChecked,
+                          commonID,
+                        ),
                     selectOneToAll: false,
                   ),
                 ),
@@ -386,14 +390,12 @@ class _AddProductViewState extends State<_AddProductView> {
           onTap: () async {
             final result = await showModalBottomSheet<String>(
               context: context,
-              builder: (_) => _buildImageSourceSheet(context, controller),
+              builder: (_) => _buildImageSourceSheet(context),
             );
             if (result == 'camera') {
               await controller.pickMainImage(fromCamera: true);
             } else if (result == 'gallery') {
               await controller.pickMainImage(fromCamera: false);
-            } else if (result == 'live_camera') {
-              await _showCameraPreview(context, controller);
             }
           },
           child: Container(
@@ -519,20 +521,13 @@ class _AddProductViewState extends State<_AddProductView> {
   }
 
   // ───────── Bottom Sheet: Camera or Gallery ─────────
-  Widget _buildImageSourceSheet(BuildContext context, [AddProductController? controller]) {
-    final bool showLiveCamera = controller != null && controller.isCameraInitialized;
+  Widget _buildImageSourceSheet(
+    BuildContext context, [
+    AddProductController? controller,
+  ]) {
     return SafeArea(
       child: Wrap(
         children: [
-          if (showLiveCamera)
-            ListTile(
-              leading: const Icon(Icons.camera),
-              title: const Text('Live Camera Preview'),
-              onTap: () async {
-                await controller.initializeCamera();
-                Navigator.pop(context, 'live_camera');
-              },
-            ),
           ListTile(
             leading: const Icon(Icons.camera_alt_outlined),
             title: const Text('Take Photo'),
@@ -559,47 +554,6 @@ class _AddProductViewState extends State<_AddProductView> {
             onTap: () => Navigator.pop(context),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _showCameraPreview(BuildContext context, AddProductController controller) async {
-    if (!controller.isCameraInitialized || controller.cameraController == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Camera not available')),
-      );
-      return;
-    }
-
-    await showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 300,
-              height: 400,
-              child: CameraPreview(controller.cameraController!),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await controller.pickMainImage(fromCamera: true);
-                  },
-                  child: const Text('Capture'),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

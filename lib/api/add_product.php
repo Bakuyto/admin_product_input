@@ -36,11 +36,11 @@ $name           = $conn->real_escape_string(trim($json['name']));
 $sku            = $conn->real_escape_string(trim($json['sku'] ?? ''));
 $price          = (float)$json['price'];
 $stock_quantity = (int)$json['stock_quantity'];
-$description    = $conn->real_escape_string($json['description']);
+$description    = $conn->real_escape_string($json['description'] ?? '');
 
-// Handle category IDs properly
+// Handle category IDs
 $categoryArray = is_array($json['category_ids']) ? $json['category_ids'] : [];
-sort($categoryArray, SORT_NUMERIC); // <-- sort ascending
+sort($categoryArray, SORT_NUMERIC);
 $category_ids  = $conn->real_escape_string(implode(',', $categoryArray));
 
 // Folder setup
@@ -48,14 +48,14 @@ $uploadDir = __DIR__ . "/picture/images/";
 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) jsonResponse(false, "Failed to create image folder");
 
 $allowedTypes = ['jpg','jpeg','png','gif'];
-$maxSize = 5 * 1024 * 1024; // 5MB
+$maxSize = 5 * 1024 * 1024; // 5 MB
 
 // ── Main image (required)
 if (!isset($_FILES['main_image'])) jsonResponse(false, "Main image is required");
 $mainImage = $_FILES['main_image'];
 $ext = strtolower(pathinfo($mainImage['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, $allowedTypes)) jsonResponse(false, "Main image type not allowed");
-if ($mainImage['size'] > $maxSize) jsonResponse(false, "Main image exceeds 5MB");
+if ($mainImage['size'] > $maxSize) jsonResponse(false, "Main image exceeds 5 MB");
 
 $mainFileName = uniqid('main_') . '.' . $ext;
 $mainDest = $uploadDir . $mainFileName;
