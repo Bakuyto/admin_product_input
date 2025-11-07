@@ -76,7 +76,7 @@ class AddProductModel {
             ? flattenCategories(subs, parentId: id, depth: depth + 1)
             : [],
         checked: false,
-        show: depth == 0,
+        show: false, // Hide all categories initially, let user expand manually
         pid: parentId,
         commonID: 0,
       );

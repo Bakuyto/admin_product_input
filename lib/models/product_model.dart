@@ -124,7 +124,7 @@ class ProductModel extends ChangeNotifier {
         title: title,
         children: subs.isNotEmpty ? _buildTree(subs, parentId: id, depth: depth + 1) : [],
         checked: false,
-        show: depth == 0, // Show parents, hide children initially
+        show: false, // Hide all categories initially, let user expand manually
         pid: parentId,
         commonID: 0,
       ));

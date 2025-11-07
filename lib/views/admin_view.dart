@@ -200,9 +200,9 @@ class AdminView extends StatelessWidget {
           activeColor: activeColor,
         ),
         _SidebarItem(
-          icon: Icons.group_outlined,
-          title: 'User Management',
-          route: '/manage_users',
+          icon: Icons.category_outlined,
+          title: 'Category Management',
+          route: '/manage_categories',
           activeColor: activeColor,
         ),
         _SidebarItem(
@@ -310,15 +310,15 @@ class AdminView extends StatelessWidget {
         secondaryColor: const Color(0xFFFFF3E0),
         subtitle: 'Check and update customer information.',
       ),
-      // 5. USER MANAGEMENT (NEW)
+      // 5. CATEGORY MANAGEMENT
       _buildDashboardCard(
         context,
-        icon: Icons.group_outlined,
-        title: 'User Management',
-        route: '/manage_users',
+        icon: Icons.category_outlined,
+        title: 'Manage Categories',
+        route: '/manage_categories',
         color: const Color(0xFF673AB7),
         secondaryColor: const Color(0xFFEDE7F6),
-        subtitle: 'Manage user accounts, roles, and permissions.',
+        subtitle: 'Add, edit, and delete product categories.',
       ),
       // 6. SALES ANALYTICS
       _buildDashboardCard(
