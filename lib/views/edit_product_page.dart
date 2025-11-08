@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  edit_product_page.dart (Update / Delete Product)
+//  edit_product_page.dart (Modern UI – Update / Delete Product)
 // ─────────────────────────────────────────────────────────────────────────────
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -12,7 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../controllers/edit_product_controller.dart';
 
 class EditProductPage extends StatefulWidget {
-  final int productId; // <-- passed from list
+  final int productId;
   const EditProductPage({super.key, required this.productId});
 
   @override
@@ -38,7 +38,7 @@ class _EditProductPageState extends State<EditProductPage> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  UI
+//  MODERN VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 class _EditProductView extends StatefulWidget {
   const _EditProductView();
@@ -47,51 +47,42 @@ class _EditProductView extends StatefulWidget {
   State<_EditProductView> createState() => _EditProductViewState();
 }
 
-class _EditProductViewState extends State<_EditProductView> {
-  TreeNode _mapToTreeNode(Map<String, dynamic> map) {
-    return TreeNode(
-      id: map['id'] as int,
-      title: map['value'] as String,
-      children: (map['children'] as List<Map<String, dynamic>>).map(_mapToTreeNode).toList(),
-      checked: false,
-      show: true,
-      pid: 0,
-      commonID: 0,
+class _EditProductViewState extends State<_EditProductView>
+    with TickerProviderStateMixin {
+  late final AnimationController _fadeCtrl;
+  late final Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
     );
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeInOut);
+    _fadeCtrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<EditProductController>();
+    final ctrl = context.watch<EditProductController>();
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    // Ensure we set the HtmlEditor content once after loading completes
-    // (HtmlEditor may ignore initialText when it's constructed before data arrives)
-    if (!controller.isLoading && controller.errorMessage == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          // setText is safe to call repeatedly; guard with a flag to avoid extra calls
-          if (controller.model.description.isNotEmpty) {
-            controller.htmlController.setText(controller.model.description);
-          } else {
-            controller.htmlController.setText('');
-          }
-        } catch (_) {
-          // ignore failures - editor may not be ready yet
-        }
-      });
-    }
-
-    // Show loading while fetching the product
-    if (controller.isLoading) {
+    // -------------------------------------------------
+    //  Loading / Error handling
+    // -------------------------------------------------
+    if (ctrl.isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Description will be provided to the HtmlEditor via initialText below.
-
-    // Show error if loading failed
-    if (controller.errorMessage != null) {
+    if (ctrl.errorMessage != null) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Error'),
@@ -106,14 +97,10 @@ class _EditProductViewState extends State<_EditProductView> {
               const SizedBox(height: 16),
               Text(
                 'Failed to load product',
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: theme.textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
-              Text(
-                controller.errorMessage!,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text(ctrl.errorMessage!, textAlign: TextAlign.center),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
@@ -125,98 +112,788 @@ class _EditProductViewState extends State<_EditProductView> {
       );
     }
 
+    // -------------------------------------------------
+    //  Main UI
+    // -------------------------------------------------
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Edit Product'),
+        title: const Text(
+          'Edit Product',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [primary, primary.withOpacity(0.85)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_forever, color: Colors.white),
             tooltip: 'Delete product',
-            onPressed: () => _confirmDelete(context, controller),
+            onPressed: () => _confirmDelete(context, ctrl),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: controller.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _modernCard(
-                icon: Icons.inventory_2_outlined,
-                title: "Product Details",
-                child: _buildProductDetailsCard(controller),
-              ),
-              _modernCard(
-                icon: Icons.description_outlined,
-                title: "Description",
-                child: _buildDescriptionCard(controller),
-              ),
-              _modernCard(
-                icon: Icons.category_outlined,
-                title: "Categories & Structure",
-                child: _buildCategoriesCard(context, controller),
-              ),
-              _modernCard(
-                icon: Icons.image_outlined,
-                title: "Images & Media",
-                child: _buildImagesCard(context, controller),
-              ),
-              const SizedBox(height: 30),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.save_outlined, size: 24),
-                      label: const Text(
-                        "Update Product",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      onPressed: () => controller.updateProduct(context),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        backgroundColor: primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 6,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.cancel_outlined, size: 24),
-                      label: const Text(
-                        "Cancel",
-                        style: TextStyle(fontSize: 18),
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        side: BorderSide(color: primary),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: ctrl.formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildModernCard(
+                  icon: Icons.inventory_2_rounded,
+                  title: "Product Details",
+                  accent: Colors.blue.shade600,
+                  child: _buildProductDetails(ctrl),
+                ),
+                _buildModernCard(
+                  icon: Icons.description_rounded,
+                  title: "Description",
+                  accent: Colors.green.shade600,
+                  child: _buildDescription(ctrl),
+                ),
+                _buildModernCard(
+                  icon: Icons.category_rounded,
+                  title: "Categories & Structure",
+                  accent: Colors.purple.shade600,
+                  child: _buildCategories(context, ctrl),
+                ),
+                _buildModernCard(
+                  icon: Icons.collections_rounded,
+                  title: "Images & Media",
+                  accent: Colors.orange.shade600,
+                  child: _buildImages(context, ctrl),
+                ),
+                const SizedBox(height: 32),
+                _buildActionButtons(primary, ctrl, context),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ────── Confirmation dialog for delete ──────
+  // ──────────────────────────────────────
+  //  Modern Card Wrapper
+  // ──────────────────────────────────────
+  Widget _buildModernCard({
+    required IconData icon,
+    required String title,
+    required Color accent,
+    required Widget child,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200.withOpacity(0.5),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [accent, accent.withOpacity(0.7)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey.shade800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: Colors.grey.shade200, height: 1),
+                const SizedBox(height: 18),
+                child,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────
+  //  Product Details
+  // ──────────────────────────────────────
+  Widget _buildProductDetails(EditProductController c) {
+    return Column(
+      children: [
+        _modernInput(c.nameController, "Product Name *", Icons.title),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: _modernInput(c.skuController, "SKU", Icons.qr_code),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _modernInput(
+                c.priceController,
+                "Price *",
+                Icons.attach_money,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) {
+                  if (v!.isEmpty) return 'Required';
+                  if (double.tryParse(v) == null) return 'Invalid price';
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        _modernInput(
+          c.stockController,
+          "Stock Quantity *",
+          Icons.inventory,
+          keyboardType: TextInputType.number,
+          validator: (v) {
+            if (v!.isEmpty) return 'Required';
+            if (int.tryParse(v) == null) return 'Invalid number';
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _modernInput(
+    TextEditingController ctrl,
+    String label,
+    IconData icon, {
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    final required = label.contains('*');
+    return TextFormField(
+      controller: ctrl,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: required ? label.replaceAll(' *', '') : label,
+        prefixIcon: Icon(icon, size: 20, color: Colors.grey.shade600),
+        suffixIcon: required
+            ? const Icon(Icons.star, size: 16, color: Colors.redAccent)
+            : null,
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+        ),
+      ),
+      validator:
+          validator ??
+          (v) => (required && (v == null || v.isEmpty)) ? 'Required' : null,
+    );
+  }
+
+  // ──────────────────────────────────────
+  //  Description
+  // ──────────────────────────────────────
+  Widget _buildDescription(EditProductController c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Rich product description supports bold, lists, links, and more.",
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: HtmlEditor(
+              controller: c.htmlController,
+              htmlEditorOptions: HtmlEditorOptions(
+                initialText: c.model.description,
+                hint: "Describe your product in detail...",
+                shouldEnsureVisible: true,
+              ),
+              htmlToolbarOptions: const HtmlToolbarOptions(
+                toolbarPosition: ToolbarPosition.aboveEditor,
+                defaultToolbarButtons: [
+                  StyleButtons(),
+                  FontButtons(clearAll: false),
+                  ColorButtons(),
+                  ListButtons(),
+                  ParagraphButtons(),
+                ],
+              ),
+              otherOptions: const OtherOptions(height: 320),
+              callbacks: Callbacks(
+                onChangeContent: (content) {
+                  c.model.description = content ?? '';
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ──────────────────────────────────────
+  //  Categories
+  // ──────────────────────────────────────
+  Widget _buildCategories(BuildContext ctx, EditProductController c) {
+    final canEdit = c.model.selectedCategoryIds.length == 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _actionChip(
+              label: 'Add Parent',
+              icon: Icons.add_circle_outline,
+              onTap: () => c.openAddCategoryDialog(ctx, parentId: 0),
+            ),
+            _actionChip(
+              label: 'Add Sub',
+              icon: Icons.call_split,
+              onTap: c.model.selectedCategoryIds.isEmpty
+                  ? null
+                  : () => c.openAddCategoryDialog(
+                      ctx,
+                      parentId: c.model.selectedCategoryIds.first,
+                    ),
+              enabled: c.model.selectedCategoryIds.isNotEmpty,
+            ),
+            _actionChip(
+              label: 'Edit',
+              icon: Icons.edit_outlined,
+              onTap: canEdit
+                  ? () {
+                      final sel = c.model.checkedList.first;
+                      c.openEditCategoryDialog(
+                        ctx,
+                        id: sel['id'] as int,
+                        currentName: sel['value'] as String,
+                      );
+                    }
+                  : null,
+              enabled: canEdit,
+              color: Colors.orange,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          "Select one or more categories. Use > to expand.",
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 13.5),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          height: 400,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade100,
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: c.model.loadingCategories
+              ? const Center(child: CircularProgressIndicator())
+              : Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: GenerateTree(
+                    data: c.model.treeListData,
+                    onChecked: (node, isChecked, commonID) =>
+                        c.updateCheckedCategories(node, isChecked, commonID),
+                    selectOneToAll: false,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionChip({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onTap,
+    bool enabled = true,
+    Color? color,
+  }) {
+    return FilterChip(
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      avatar: Icon(icon, size: 18),
+      selected: false,
+      onSelected: enabled ? (_) => onTap?.call() : null,
+      backgroundColor: enabled
+          ? (color?.withOpacity(0.1) ?? Colors.indigo.shade50)
+          : Colors.grey.shade200,
+      selectedColor: color?.withOpacity(0.2),
+      labelStyle: TextStyle(
+        color: enabled
+            ? (color ?? Colors.indigo.shade700)
+            : Colors.grey.shade500,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      side: BorderSide.none,
+    );
+  }
+
+  // ──────────────────────────────────────
+  //  Images & Media
+  // ──────────────────────────────────────
+  Widget _buildImages(BuildContext ctx, EditProductController c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle("Main Product Image"),
+        const SizedBox(height: 12),
+        Center(
+          child: _imagePickerBox(
+            context: ctx,
+            imageBase64: c.model.mainImageBase64,
+            onTap: () => _showImageSourceSheet(ctx, (src) {
+              if (src == 'camera') {
+                c.pickMainImage(fromCamera: true);
+              } else if (src == 'gallery') {
+                c.pickMainImage(fromCamera: false);
+              } else if (src == 'live_camera') {
+                _showLiveCamera(ctx, c);
+              }
+            }, showLive: c.isCameraInitialized),
+            isMain: true,
+          ),
+        ),
+        const SizedBox(height: 28),
+        _sectionTitle("Additional Gallery Images"),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            _addImageButton(
+              ctx,
+              () => _showImageSourceSheet(ctx, (src) {
+                if (src == 'camera') {
+                  c.pickSubImages(fromCamera: true);
+                } else if (src == 'gallery') {
+                  c.pickSubImages(fromCamera: false);
+                }
+              }),
+            ),
+            ...c.model.subImagesBase64.asMap().entries.map((e) {
+              final i = e.key;
+              final base64 = e.value;
+              return _galleryThumb(base64, () => c.removeSubImage(i));
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(String t) => Text(
+    t,
+    style: TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.bold,
+      color: Colors.grey.shade800,
+    ),
+  );
+
+  // ─── Image Picker Box (main) ───
+  Widget _imagePickerBox({
+    required BuildContext context,
+    required String? imageBase64,
+    required VoidCallback onTap,
+    required bool isMain,
+    bool showLive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        height: isMain ? 180 : 110,
+        width: isMain ? double.infinity : 110,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: imageBase64 != null
+                ? Colors.blue.shade600
+                : Colors.grey.shade400,
+            width: imageBase64 != null ? 2.5 : 2,
+          ),
+          boxShadow: imageBase64 != null
+              ? [
+                  BoxShadow(
+                    color: Colors.blue.shade100.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: imageBase64 != null
+              ? Image.memory(
+                  base64Decode(imageBase64),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                )
+              : Container(
+                  color: Colors.grey.shade100,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_a_photo_rounded,
+                        size: isMain ? 48 : 32,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isMain ? "Tap to change main image" : "Add",
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Add button for sub-images ───
+  Widget _addImageButton(BuildContext ctx, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Icon(
+          Icons.add_photo_alternate_outlined,
+          size: 36,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  // ─── Gallery thumbnail with remove ───
+  Widget _galleryThumb(String base64, VoidCallback onRemove) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.memory(
+            base64Decode(base64),
+            width: 100,
+            height: 100,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Bottom sheet for source selection ───
+  void _showImageSourceSheet(
+    BuildContext ctx,
+    Function(String) onSelected, {
+    bool showLive = false,
+  }) {
+    showModalBottomSheet(
+      context: ctx,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _buildSourceSheet(ctx, onSelected, showLive: showLive),
+    );
+  }
+
+  Widget _buildSourceSheet(
+    BuildContext ctx,
+    Function(String) onSelected, {
+    bool showLive = false,
+  }) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (showLive)
+            ListTile(
+              leading: const Icon(Icons.camera, color: Colors.purple),
+              title: const Text(
+                'Live Camera Preview',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                onSelected('live_camera');
+              },
+            ),
+          ListTile(
+            leading: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+            title: const Text(
+              'Take Photo',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            onTap: () async {
+              final p = await Permission.camera.request();
+              if (p.isGranted) {
+                Navigator.pop(ctx);
+                onSelected('camera');
+              } else {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Camera permission denied')),
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.photo_library_rounded,
+              color: Colors.green,
+            ),
+            title: const Text(
+              'Choose from Gallery',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            onTap: () {
+              Navigator.pop(ctx);
+              onSelected('gallery');
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.close_rounded, color: Colors.red),
+            title: const Text(
+              'Cancel',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            onTap: () => Navigator.pop(ctx),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Live Camera Dialog ───
+  Future<void> _showLiveCamera(
+    BuildContext ctx,
+    EditProductController c,
+  ) async {
+    if (!c.isCameraInitialized || c.cameraController == null) {
+      ScaffoldMessenger.of(
+        ctx,
+      ).showSnackBar(const SnackBar(content: Text('Camera not available')));
+      return;
+    }
+
+    await showDialog(
+      context: ctx,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              child: SizedBox(
+                width: 320,
+                height: 420,
+                child: CameraPreview(c.cameraController!),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.camera),
+                    label: const Text('Capture'),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await c.pickMainImage(fromCamera: true);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────
+  //  Action Buttons (Update / Cancel)
+  // ──────────────────────────────────────
+  Widget _buildActionButtons(
+    Color primary,
+    EditProductController c,
+    BuildContext ctx,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 58,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.save_outlined, size: 26),
+              label: const Text(
+                "Update Product",
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => c.updateProduct(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                elevation: 8,
+                shadowColor: primary.withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: 58,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.cancel_outlined, size: 26),
+              label: const Text(
+                "Cancel",
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: primary, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ──────────────────────────────────────
+  //  Delete Confirmation
+  // ──────────────────────────────────────
   Future<void> _confirmDelete(
     BuildContext ctx,
     EditProductController ctrl,
@@ -224,6 +901,7 @@ class _EditProductViewState extends State<_EditProductView> {
     final confirm = await showDialog<bool>(
       context: ctx,
       builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete product?'),
         content: const Text('This action cannot be undone.'),
         actions: [
@@ -243,476 +921,5 @@ class _EditProductViewState extends State<_EditProductView> {
     if (confirm == true) {
       await ctrl.deleteProduct(ctx);
     }
-  }
-
-  // ────── Card wrapper (same as Add page) ──────
-  Widget _modernCard({
-    required IconData icon,
-    required String title,
-    required Widget child,
-  }) {
-    return Card(
-      elevation: 4,
-      shadowColor: Colors.grey.shade200,
-      margin: const EdgeInsets.only(bottom: 24),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.indigo.shade100,
-                  child: Icon(icon, color: Colors.indigo.shade700, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 25, thickness: 1),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ────── Product details ──────
-  Widget _buildProductDetailsCard(EditProductController c) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _inputField(c.nameController, "Product Name *"),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _inputField(c.skuController, "SKU")),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _inputField(
-                c.priceController,
-                "Price *",
-                prefix: '\$',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (v) {
-                  if (v!.isEmpty) return 'Required';
-                  if (double.tryParse(v) == null) return 'Invalid price';
-                  return null;
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _inputField(
-          c.stockController,
-          "Stock Quantity *",
-          keyboardType: TextInputType.number,
-          validator: (v) {
-            if (v!.isEmpty) return 'Required';
-            if (int.tryParse(v) == null) return 'Invalid number';
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _inputField(
-    TextEditingController ctrl,
-    String label, {
-    String? prefix,
-    String? hint,
-    String? Function(String?)? validator,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    final required = label.contains('*');
-    return TextFormField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: required ? label.replaceAll(' *', '') : label,
-        suffixIcon: required
-            ? const Padding(
-                padding: EdgeInsets.only(right: 12),
-                child: Icon(Icons.star, size: 16, color: Colors.red),
-              )
-            : null,
-        prefixText: prefix,
-        hintText: hint,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
-        ),
-      ),
-      validator:
-          validator ?? (v) => (required && v!.isEmpty) ? 'Required' : null,
-    );
-  }
-
-  // ────── Description ──────
-  Widget _buildDescriptionCard(EditProductController c) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Enter the full product description below.",
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: HtmlEditor(
-            controller: c.htmlController,
-            htmlEditorOptions: HtmlEditorOptions(
-              initialText: c.model.description,
-              hint: "Product description...",
-              autoAdjustHeight: true,
-            ),
-            otherOptions: const OtherOptions(height: 300),
-            callbacks: Callbacks(
-              onChangeContent: (String? content) {
-                c.model.description = content ?? '';
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ────── Categories ──────
-  Widget _buildCategoriesCard(BuildContext ctx, EditProductController c) {
-    final canEdit = c.model.selectedCategoryIds.length == 1;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          alignment: WrapAlignment.end,
-          children: [
-            OutlinedButton.icon(
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Add Parent'),
-              onPressed: () => c.openAddCategoryDialog(ctx, parentId: 0),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.call_split),
-              label: const Text('Add Sub'),
-              onPressed: c.model.selectedCategoryIds.isEmpty
-                  ? null
-                  : () => c.openAddCategoryDialog(
-                      ctx,
-                      parentId: c.model.selectedCategoryIds.first,
-                    ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade50,
-                foregroundColor: Colors.indigo.shade700,
-                elevation: 0,
-              ),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit'),
-              onPressed: canEdit
-                  ? () {
-                      final sel = c.model.checkedList.first;
-                      c.openEditCategoryDialog(
-                        ctx,
-                        id: sel['id'] as int,
-                        currentName: sel['value'] as String,
-                      );
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: canEdit ? Colors.orange.shade50 : null,
-                foregroundColor: canEdit ? Colors.orange.shade700 : null,
-                elevation: 0,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          "Choose categories for your product. Parent categories are displayed first. Click the expand icon (>) next to a category to view its subcategories.",
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-        ),
-        const SizedBox(height: 8),
-        c.model.loadingCategories
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 50),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            : Container(
-                height: 400,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: GenerateTree(
-                    data: c.model.treeListData,
-                    onChecked: (TreeNode node, bool isChecked, int commonID) => c.updateCheckedCategories(node, isChecked, commonID),
-                    selectOneToAll: false,
-                  ),
-                ),
-              ),
-      ],
-    );
-  }
-
-  // ────── Images ──────
-  Widget _buildImagesCard(BuildContext ctx, EditProductController c) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Main Product Image",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () async {
-            final src = await showModalBottomSheet<String>(
-              context: ctx,
-              builder: (_) => _imageSourceSheet(ctx, c),
-            );
-            if (src == 'camera') {
-              await c.pickMainImage(fromCamera: true);
-            } else if (src == 'gallery') {
-              await c.pickMainImage(fromCamera: false);
-            } else if (src == 'live_camera') {
-              await _showCameraPreview(ctx, c);
-            }
-          },
-          child: Container(
-            height: 150,
-            width: 250,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: c.model.mainImageBase64 != null
-                    ? Colors.blue.shade700
-                    : Colors.grey.shade400,
-                width: 2,
-              ),
-            ),
-            child: c.model.mainImageBase64 != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.memory(
-                      base64Decode(c.model.mainImageBase64!),
-                      fit: BoxFit.cover,
-                      width: 250,
-                      height: 150,
-                    ),
-                  )
-                : const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.camera_alt_outlined,
-                          size: 40,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 8),
-                        Text("Tap to change main image"),
-                      ],
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          "Additional Gallery Images",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            InkWell(
-              onTap: () async {
-                final src = await showModalBottomSheet<String>(
-                  context: ctx,
-                  builder: (_) => _imageSourceSheet(ctx),
-                );
-                if (src == 'camera') {
-                  await c.pickSubImages(fromCamera: true);
-                } else if (src == 'gallery') {
-                  await c.pickSubImages(fromCamera: false);
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.add_a_photo_outlined,
-                    size: 30,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-            ),
-            ...List.generate(
-              c.model.subImagesBase64.length,
-              (i) => Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(
-                      base64Decode(c.model.subImagesBase64[i]),
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: GestureDetector(
-                      onTap: () => c.removeSubImage(i),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(
-                          Icons.close,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _imageSourceSheet(BuildContext ctx, [EditProductController? c]) {
-    final live = c != null && c.isCameraInitialized;
-    return SafeArea(
-      child: Wrap(
-        children: [
-          if (live)
-            ListTile(
-              leading: const Icon(Icons.camera),
-              title: const Text('Live Camera Preview'),
-              onTap: () => Navigator.pop(ctx, 'live_camera'),
-            ),
-          ListTile(
-            leading: const Icon(Icons.camera_alt_outlined),
-            title: const Text('Take Photo'),
-            onTap: () async {
-              final p = await Permission.camera.request();
-              if (p.isGranted) Navigator.pop(ctx, 'camera');
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Choose from Gallery'),
-            onTap: () => Navigator.pop(ctx, 'gallery'),
-          ),
-          const Divider(height: 0),
-          ListTile(
-            leading: const Icon(Icons.close),
-            title: const Text('Cancel'),
-            onTap: () => Navigator.pop(ctx),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showCameraPreview(
-    BuildContext ctx,
-    EditProductController c,
-  ) async {
-    if (!c.isCameraInitialized || c.cameraController == null) {
-      ScaffoldMessenger.of(
-        ctx,
-      ).showSnackBar(const SnackBar(content: Text('Camera not available')));
-      return;
-    }
-    await showDialog(
-      context: ctx,
-      builder: (_) => Dialog(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 300,
-              height: 400,
-              child: CameraPreview(c.cameraController!),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await c.pickMainImage(fromCamera: true);
-                  },
-                  child: const Text('Capture'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

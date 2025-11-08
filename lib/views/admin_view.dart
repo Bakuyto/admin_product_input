@@ -1,355 +1,338 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:my_flutter_app/models/pub_var.dart' as pub_var;
 import '../routes/app_routes.dart';
 
-class AdminView extends StatelessWidget {
+class AdminView extends StatefulWidget {
   const AdminView({Key? key}) : super(key: key);
 
   @override
+  State<AdminView> createState() => _AdminViewState();
+}
+
+class _AdminViewState extends State<AdminView> {
+  late Future<Map<String, dynamic>> _dashboardFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardFuture = _fetchDashboardData();
+  }
+
+  Future<Map<String, dynamic>> _fetchDashboardData() async {
+    final String apiUrl = "${pub_var.apiBase}/get_dashboard_data.php";
+
+    try {
+      final response = await http
+          .get(Uri.parse(apiUrl))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        if (jsonData.containsKey('error')) {
+          throw Exception(jsonData['error']);
+        }
+        return {
+          'total_products': jsonData['total_products']?.toString() ?? '0',
+          'new_customers': jsonData['new_customers']?.toString() ?? '0',
+          'unresolved_tickets':
+              jsonData['unresolved_tickets']?.toString() ?? '0',
+        };
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _dashboardFuture = _fetchDashboardData();
+    });
+  }
+
+  // Modern Color Palette
+  static const Color primaryColor = Color(0xFF42A5F5);
+  static const Color secondaryColor = Color(0xFF1E88E5);
+  static const Color scaffoldBackgroundColor = Color(0xFFF5F7FA);
+
+  @override
   Widget build(BuildContext context) {
-    // Modern Color Palette
-    const Color primaryColor = Color(0xFF42A5F5); // Light Blue
-    const Color secondaryColor = Color(0xFF1E88E5);
-    const Color scaffoldBackgroundColor = Color(0xFFF5F7FA);
-    const double desktopBreakpoint = 1000;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
 
     return WillPopScope(
       onWillPop: () async {
-        // Go to Login when back is pressed
         Navigator.pushReplacementNamed(context, AppRoutes.login);
-        return false; // Prevent default pop
+        return false;
       },
       child: Scaffold(
         backgroundColor: scaffoldBackgroundColor,
         appBar: AppBar(
-          // Disable automatic back arrow
           automaticallyImplyLeading: false,
-
-          title: const Text(
+          title: Text(
             'Admin Dashboard',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            style: textTheme.titleLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           backgroundColor: primaryColor,
           elevation: 4,
           shadowColor: Colors.black12,
         ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final bool isLargeScreen =
-                constraints.maxWidth >= desktopBreakpoint;
-
-            if (isLargeScreen) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Sidebar
-                  Container(
-                    width: constraints.maxWidth * 0.28,
-                    padding: const EdgeInsets.all(24.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        right: BorderSide(
-                          color: Colors.grey.shade200,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: _buildLargeScreenSidebar(context, secondaryColor),
-                  ),
-                  // Main Content
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLargeScreenHeader(context),
-                          const SizedBox(height: 32),
-                          _buildCardGrid(context, constraints.maxWidth * 0.72),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+        body: RefreshIndicator(
+          onRefresh: _refreshData,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double horizontalPadding = _getHorizontalPadding(
+                constraints.maxWidth,
               );
-            } else {
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(horizontalPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSmallScreenHeader(context),
-                    const SizedBox(height: 24),
+                    _buildQuickStats(context, constraints),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      context,
+                      'Tool Access & Management',
+                      textTheme,
+                    ),
+                    const SizedBox(height: 16),
                     _buildCardGrid(context, constraints.maxWidth),
+                    const SizedBox(height: 24),
                   ],
                 ),
               );
-            }
-          },
+            },
+          ),
         ),
       ),
     );
   }
-  // -----------------------------------------------------------------------
-  // ⭐ MODERN DESKTOP UI COMPONENTS
-  // -----------------------------------------------------------------------
 
-  /// Builds the large, clear header for the main content area (Desktop)
-  Widget _buildLargeScreenHeader(BuildContext context) {
+  double _getHorizontalPadding(double width) {
+    if (width <= 600) return 16;
+    if (width <= 900) return 24;
+    if (width <= 1200) return 32;
+    return 48;
+  }
+
+  Widget _buildSectionTitle(
+    BuildContext context,
+    String title,
+    TextTheme textTheme,
+  ) {
+    return Text(
+      title,
+      style: textTheme.headlineMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  // === RESPONSIVE QUICK STATS ===
+  Widget _buildQuickStats(BuildContext context, BoxConstraints constraints) {
+    final width = constraints.maxWidth;
+    final crossAxisCount = width <= 500 ? 1 : (width <= 900 ? 2 : 3);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Tool Access & Management',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+        _buildSectionTitle(
+          context,
+          'Key Metrics Overview',
+          Theme.of(context).textTheme,
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Select an action to begin managing the application and inventory.',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
+        const SizedBox(height: 16),
+        FutureBuilder<Map<String, dynamic>>(
+          future: _dashboardFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildLoadingGrid(crossAxisCount);
+            }
+
+            if (snapshot.hasError) {
+              return _buildErrorTile(
+                'Failed to load data. Pull to retry.',
+                _refreshData,
+              );
+            }
+
+            final data =
+                snapshot.data ??
+                {
+                  'total_products': '0',
+                  'new_customers': '0',
+                  'unresolved_tickets': '0',
+                };
+
+            final List<Widget> statTiles = [
+              InfoTile(
+                icon: Icons.inventory_2_outlined,
+                title: 'Total Products',
+                value: data['total_products'],
+                color: const Color(0xFF42A5F5),
+              ),
+              InfoTile(
+                icon: Icons.person_add_alt,
+                title: 'New Customers (30d)',
+                value: data['new_customers'],
+                color: const Color(0xFFFF9800),
+              ),
+              InfoTile(
+                icon: Icons.warning_amber_outlined,
+                title: 'Unresolved Tickets',
+                value: data['unresolved_tickets'],
+                color: const Color(0xFFE91E63),
+              ),
+            ];
+
+            return GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: crossAxisCount == 1 ? 4.0 : 3.5,
+              children: statTiles,
+            );
+          },
         ),
+        const Divider(height: 40, thickness: 1.5, color: Colors.black12),
       ],
     );
   }
 
-  /// Builds the Summary Sidebar (Desktop) - IMPROVED
-  Widget _buildLargeScreenSidebar(BuildContext context, Color activeColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Greeting Card
-        Card(
-          elevation: 4, // Subtle elevation for the greeting card
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          color: const Color(0xFFE3F2FD), // Very light blue for background
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  'Overview of key metrics:',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: Colors.blueGrey[600]),
-                ),
-              ],
+  Widget _buildLoadingGrid(int crossAxisCount) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: crossAxisCount,
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: crossAxisCount == 1 ? 4.0 : 3.5,
+      children: List.generate(3, (_) => const _LoadingTile()),
+    );
+  }
+
+  Widget _buildErrorTile(String message, VoidCallback onRetry) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
             ),
-          ),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
         ),
-        const SizedBox(height: 24),
-
-        // Quick Stats Section
-        Text(
-          'Quick Stats',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const Divider(height: 20, thickness: 1),
-        // Modern Info Tiles
-        const InfoTile(
-          icon: Icons.inventory_2_outlined, // Changed icon for product count
-          title: 'Total Products',
-          value: '452',
-          color: Color(0xFF42A5F5),
-        ),
-        const SizedBox(height: 15),
-        const InfoTile(
-          icon: Icons.person_add_alt,
-          title: 'New Customers (30d)',
-          value: '12',
-          color: Color(0xFFFF9800),
-        ),
-        const SizedBox(height: 15),
-        const InfoTile(
-          icon: Icons
-              .warning_amber_outlined, // Changed icon to be more ticket-like
-          title: 'Unresolved Tickets',
-          value: '5',
-          color: Color(0xFFE91E63),
-        ),
-
-        const SizedBox(height: 32),
-
-        // Admin Tools Section (New Navigation)
-        Text(
-          'Admin Tools',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const Divider(height: 20, thickness: 1),
-
-        // Navigation Links
-        _SidebarItem(
-          icon: Icons.dashboard_customize_outlined,
-          title: 'Dashboard',
-          route: '/',
-          isActive: true, // Set the current view as active
-          activeColor: activeColor,
-        ),
-        _SidebarItem(
-          icon: Icons.category_outlined,
-          title: 'Category Management',
-          route: '/manage_categories',
-          activeColor: activeColor,
-        ),
-        _SidebarItem(
-          icon: Icons.settings_outlined,
-          title: 'Settings & Config',
-          route: '/settings',
-          activeColor: activeColor,
-        ),
-      ],
+      ),
     );
   }
 
-  // -----------------------------------------------------------------------
-  // ⭐ MOBILE/TABLET UI COMPONENTS
-  // -----------------------------------------------------------------------
-
-  /// Builds a simple header/greeting for mobile/tablet view - IMPROVED
-  Widget _buildSmallScreenHeader(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Management Tools',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-            fontSize: 28,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Quick access to all management tools and metrics.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-        ),
-      ],
-    );
-  }
-
-  // -----------------------------------------------------------------------
-  // ⭐ SHARED COMPONENTS
-  // -----------------------------------------------------------------------
-
-  /// Builds the GridView of cards, adapting to the available width (FIXED OVERFLOW)
+  // === RESPONSIVE CARD GRID ===
   Widget _buildCardGrid(BuildContext context, double availableWidth) {
     int crossAxisCount;
     double childAspectRatio;
 
-    if (availableWidth <= 500) {
-      // Mobile: 2 columns, taller aspect ratio (0.9 makes it taller than wide)
+    if (availableWidth <= 600) {
       crossAxisCount = 2;
-      childAspectRatio = 0.9;
-    } else if (availableWidth <= 800) {
-      // Tablet: 2 columns, slightly taller than square
-      crossAxisCount = 2;
-      childAspectRatio = 1.1;
-    } else {
-      // Desktop: 3 columns, wider aspect ratio
+      childAspectRatio = 0.95;
+    } else if (availableWidth <= 900) {
       crossAxisCount = 3;
-      childAspectRatio = 1.4;
+      childAspectRatio = 1.1;
+    } else if (availableWidth <= 1200) {
+      crossAxisCount = 4;
+      childAspectRatio = 1.25;
+    } else {
+      crossAxisCount = 5;
+      childAspectRatio = 1.35;
     }
 
-    // Determine the number of cards to display, including the new 'User Management'
-    final List<Widget> cards = [
-      // 1. INPUT PRODUCTS
+    final cards = [
       _buildDashboardCard(
         context,
-        icon: Icons
-            .add_business_outlined, // Changed icon to be more 'add' focused
-        title: 'Input New Products',
-        route: '/input_products',
-        color: const Color(0xFF4CAF50),
-        secondaryColor: const Color(0xFFE8F5E9),
-        subtitle: 'Add new items to the inventory.',
+        Icons.add_business_outlined,
+        'Input New Products',
+        '/input_products',
+        const Color(0xFF4CAF50),
+        const Color(0xFFE8F5E9),
+        'Add new items to the inventory.',
       ),
-      // 2. PRODUCT MANAGEMENT
       _buildDashboardCard(
         context,
-        icon: Icons.inventory_2_outlined, // Use a more general inventory icon
-        title: 'Manage Products',
-        route: '/list_products',
-        color: const Color(0xFF03A9F4),
-        secondaryColor: const Color(0xFFE1F5FE),
-        subtitle: 'View, Update, and Delete inventory items.',
+        Icons.inventory_2_outlined,
+        'Manage Products',
+        '/list_products',
+        const Color(0xFF03A9F4),
+        const Color(0xFFE1F5FE),
+        'View, Update, and Delete inventory items.',
       ),
-      // 3. VIDEO MANAGEMENT
       _buildDashboardCard(
         context,
-        icon: Icons.video_collection_outlined,
-        title: 'Manage Videos',
-        route: '/manage_videos',
-        color: const Color(0xFFF44336),
-        secondaryColor: const Color(0xFFFFEBEE),
-        subtitle: 'Upload, edit, and link product videos.',
+        Icons.video_collection_outlined,
+        'Manage Videos',
+        '/manage_videos',
+        const Color(0xFFF44336),
+        const Color(0xFFFFEBEE),
+        'Upload, edit, and link product videos.',
       ),
-      // 4. CUSTOMER CONTACTS
       _buildDashboardCard(
         context,
-        icon: Icons
-            .support_agent_outlined, // Changed icon to be more 'contact' focused
-        title: 'Customer Contacts',
-        route: '/check_customers',
-        color: const Color(0xFFFF9800),
-        secondaryColor: const Color(0xFFFFF3E0),
-        subtitle: 'Check and update customer information.',
+        Icons.support_agent_outlined,
+        'Customer Contacts',
+        '/check_customers',
+        const Color(0xFFFF9800),
+        const Color(0xFFFFF3E0),
+        'Check and update customer information.',
       ),
-      // 5. CATEGORY MANAGEMENT
       _buildDashboardCard(
         context,
-        icon: Icons.category_outlined,
-        title: 'Manage Categories',
-        route: '/manage_categories',
-        color: const Color(0xFF673AB7),
-        secondaryColor: const Color(0xFFEDE7F6),
-        subtitle: 'Add, edit, and delete product categories.',
+        Icons.category_outlined,
+        'Manage Categories',
+        '/manage_categories',
+        const Color(0xFF673AB7),
+        const Color(0xFFEDE7F6),
+        'Add, edit, and delete product categories.',
       ),
-      // 6. SALES ANALYTICS
       _buildDashboardCard(
         context,
-        icon: Icons.insights_outlined,
-        title: 'Sales Analytics',
-        route: '/analytics',
-        color: const Color(0xFF9C27B0),
-        secondaryColor: const Color(0xFFF3E5F5),
-        subtitle: 'Review sales reports and trends.',
+        Icons.insights_outlined,
+        'Sales Analytics',
+        '/analytics',
+        const Color(0xFF9C27B0),
+        const Color(0xFFF3E5F5),
+        'Review sales reports and trends.',
       ),
-      // 7. APP SETTINGS (Removed old settings card, using one from sidebar,
-      // but kept space for future expansion if needed)
       _buildDashboardCard(
         context,
-        icon: Icons.settings_outlined,
-        title: 'App Settings',
-        route: '/settings',
-        color: const Color(0xFF795548),
-        secondaryColor: const Color(0xFFEFEBE9),
-        subtitle: 'Configure application preferences.',
+        Icons.settings_outlined,
+        'App Settings',
+        '/settings',
+        const Color(0xFF795548),
+        const Color(0xFFEFEBE9),
+        'Configure application preferences.',
       ),
-      // 8. ADD ONE MORE CARD FOR 2x4 symmetry
       _buildDashboardCard(
         context,
-        icon: Icons.attach_money,
-        title: 'Price Management',
-        route: '/price_management',
-        color: const Color(0xFF009688),
-        secondaryColor: const Color(0xFFE0F2F1),
-        subtitle: 'Adjust product pricing and promotions.',
+        Icons.attach_money,
+        'Price Management',
+        '/price_management',
+        const Color(0xFF009688),
+        const Color(0xFFE0F2F1),
+        'Adjust product pricing and promotions.',
       ),
     ];
 
@@ -357,93 +340,76 @@ class AdminView extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: crossAxisCount,
-      crossAxisSpacing: 24,
-      mainAxisSpacing: 24,
+      crossAxisSpacing: 20,
+      mainAxisSpacing: 20,
       childAspectRatio: childAspectRatio,
       children: cards,
     );
   }
 
-  // Helper widget for the action cards (required by _buildCardGrid)
   Widget _buildDashboardCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String route,
-    required Color color,
-    required Color secondaryColor,
-    required String subtitle,
-  }) {
-    const List<BoxShadow> modernShadow = [
-      BoxShadow(
-        color: Color.fromRGBO(0, 0, 0, 0.05),
-        offset: Offset(0, 4),
-        blurRadius: 8,
-      ),
-    ];
+    BuildContext context,
+    IconData icon,
+    String title,
+    String route,
+    Color color,
+    Color secondaryColor,
+    String subtitle,
+  ) {
+    final textTheme = Theme.of(context).textTheme;
+    final width = MediaQuery.of(context).size.width;
+    final isSmall = width < 400;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: modernShadow,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: () {
-            Navigator.pushNamed(context, route);
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: secondaryColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, size: 32, color: color),
+        onTap: () => Navigator.pushNamed(context, route),
+        child: Padding(
+          padding: EdgeInsets.all(isSmall ? 14 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: secondaryColor,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                    fontSize: 18,
-                  ),
-                  textAlign: TextAlign.left,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                child: Icon(icon, size: isSmall ? 28 : 32, color: color),
+              ),
+              const Spacer(),
+              Text(
+                title,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: isSmall ? 15 : 17,
+                  height: 1.2,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
+                  fontSize: isSmall ? 11 : 12,
                 ),
-              ],
-            ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
-// -----------------------------------------------------------------------
-// ⭐ HELPER WIDGETS
-// -----------------------------------------------------------------------
 
-/// Helper widget for the desktop summary panel
+// === INFO TILE (Responsive & Accessible) ===
 class InfoTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -460,108 +426,121 @@ class InfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.05),
-            offset: Offset(0, 2),
-            blurRadius: 4,
-          ),
-        ],
+    final textTheme = Theme.of(context).textTheme;
+    final isSmall = MediaQuery.of(context).size.width < 400;
+
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: EdgeInsets.all(isSmall ? 12 : 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: isSmall ? 22 : 26),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      fontSize: isSmall ? 12 : 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black87,
-                    fontSize: 20,
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      fontSize: isSmall ? 20 : 24,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// New helper widget for the sidebar navigation links
-class _SidebarItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String route;
-  final bool isActive;
-  final Color activeColor;
-
-  const _SidebarItem({
-    required this.icon,
-    required this.title,
-    required this.route,
-    this.isActive = false,
-    required this.activeColor,
-  });
+// === LOADING TILE ===
+class _LoadingTile extends StatelessWidget {
+  const _LoadingTile({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Material(
-        color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            Navigator.pushNamed(context, route);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  color: isActive ? activeColor : Colors.grey[700],
-                  size: 20,
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: isActive ? activeColor : Colors.grey[700],
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+    final isSmall = MediaQuery.of(context).size.width < 400;
+
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isSmall ? 12 : 16),
+        child: Row(
+          children: [
+            Container(
+              width: isSmall ? 38 : 42,
+              height: isSmall ? 38 : 42,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _ShimmerLine(width: isSmall ? 80 : 100),
+                  const SizedBox(height: 6),
+                  _ShimmerLine(width: isSmall ? 30 : 40),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShimmerLine extends StatelessWidget {
+  final double width;
+  const _ShimmerLine({required this.width});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 14,
+      width: width,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }

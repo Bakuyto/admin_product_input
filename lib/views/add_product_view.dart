@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  add_product_page.dart (With Camera + Gallery Support)
+//  Enhanced Add Product Page (Modern UI)
 // ─────────────────────────────────────────────────────────────────────────────
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -37,7 +37,7 @@ class _AddProductPageState extends State<AddProductPage> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  UI
+//  MODERN UI VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 class _AddProductView extends StatefulWidget {
   const _AddProductView();
@@ -46,7 +46,31 @@ class _AddProductView extends StatefulWidget {
   State<_AddProductView> createState() => _AddProductViewState();
 }
 
-class _AddProductViewState extends State<_AddProductView> {
+class _AddProductViewState extends State<_AddProductView>
+    with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    );
+    _fadeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<AddProductController>();
@@ -56,103 +80,137 @@ class _AddProductViewState extends State<_AddProductView> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Add New Product'),
+        title: const Text(
+          'Add New Product',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [primaryColor, primaryColor.withOpacity(0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.preview_outlined),
+            onPressed: () {
+              // Preview product
+            },
+            tooltip: 'Preview',
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: controller.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _modernCard(
-                icon: Icons.inventory_2_outlined,
-                title: "Product Details",
-                child: _buildProductDetailsCard(controller),
-              ),
-              _modernCard(
-                icon: Icons.description_outlined,
-                title: "Description",
-                child: _buildDescriptionCard(controller),
-              ),
-              _modernCard(
-                icon: Icons.category_outlined,
-                title: "Categories & Structure",
-                child: _buildCategoriesCard(context, controller),
-              ),
-              _modernCard(
-                icon: Icons.image_outlined,
-                title: "Images & Media",
-                child: _buildImagesCard(context, controller),
-              ),
-              const SizedBox(height: 30),
-              FilledButton.icon(
-                icon: const Icon(Icons.check_circle_outline, size: 24),
-                label: const Text(
-                  "Save Product",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: controller.formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildModernCard(
+                  icon: Icons.inventory_2_rounded,
+                  title: "Product Details",
+                  color: Colors.blue.shade600,
+                  child: _buildProductDetailsCard(controller),
                 ),
-                onPressed: () => controller.saveProduct(context),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  backgroundColor: primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  elevation: 6,
+                _buildModernCard(
+                  icon: Icons.description_rounded,
+                  title: "Description",
+                  color: Colors.green.shade600,
+                  child: _buildDescriptionCard(controller),
                 ),
-              ),
-            ],
+                _buildModernCard(
+                  icon: Icons.category_rounded,
+                  title: "Categories & Structure",
+                  color: Colors.purple.shade600,
+                  child: _buildCategoriesCard(context, controller),
+                ),
+                _buildModernCard(
+                  icon: Icons.collections_rounded,
+                  title: "Images & Media",
+                  color: Colors.orange.shade600,
+                  child: _buildImagesCard(context, controller),
+                ),
+                const SizedBox(height: 32),
+                _buildSaveButton(primaryColor, controller, context),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ───────── Modern Card Wrapper ─────────
-  Widget _modernCard({
+  // ───────── Enhanced Modern Card ─────────
+  Widget _buildModernCard({
     required IconData icon,
     required String title,
+    required Color color,
     required Widget child,
   }) {
-    return Card(
-      elevation: 4,
-      shadowColor: Colors.grey.shade200,
+    return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200.withOpacity(0.5),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(22.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.indigo.shade100,
-                  child: Icon(icon, color: Colors.indigo.shade700, size: 22),
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [color, color.withOpacity(0.7)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey.shade800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
+                const SizedBox(height: 16),
+                Divider(color: Colors.grey.shade200, height: 1),
+                const SizedBox(height: 18),
+                child,
               ],
             ),
-            const Divider(height: 25, thickness: 1),
-            child,
-          ],
+          ),
         ),
       ),
     );
@@ -161,19 +219,28 @@ class _AddProductViewState extends State<_AddProductView> {
   // ───────── Product Details ─────────
   Widget _buildProductDetailsCard(AddProductController controller) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _inputField(controller.nameController, "Product Name *"),
-        const SizedBox(height: 16),
+        _modernInputField(
+          controller.nameController,
+          "Product Name *",
+          Icons.title,
+        ),
+        const SizedBox(height: 18),
         Row(
           children: [
-            Expanded(child: _inputField(controller.skuController, "SKU")),
+            Expanded(
+              child: _modernInputField(
+                controller.skuController,
+                "SKU",
+                Icons.qr_code,
+              ),
+            ),
             const SizedBox(width: 16),
             Expanded(
-              child: _inputField(
+              child: _modernInputField(
                 controller.priceController,
                 "Price *",
-                prefix: '\$',
+                Icons.attach_money,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -186,10 +253,11 @@ class _AddProductViewState extends State<_AddProductView> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        _inputField(
+        const SizedBox(height: 18),
+        _modernInputField(
           controller.stockController,
           "Stock Quantity *",
+          Icons.inventory,
           keyboardType: TextInputType.number,
           validator: (v) {
             if (v!.isEmpty) return 'Required';
@@ -201,14 +269,13 @@ class _AddProductViewState extends State<_AddProductView> {
     );
   }
 
-  // ───────── Input Field ─────────
-  Widget _inputField(
+  // ───────── Modern Input Field ─────────
+  Widget _modernInputField(
     TextEditingController controller,
-    String label, {
-    String? prefix,
-    String? hint,
-    String? Function(String?)? validator,
+    String label,
+    IconData icon, {
     TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
   }) {
     final bool isRequired = label.contains('*');
     return TextFormField(
@@ -216,32 +283,32 @@ class _AddProductViewState extends State<_AddProductView> {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: isRequired ? label.replaceAll(' *', '') : label,
+        prefixIcon: Icon(icon, size: 20, color: Colors.grey.shade600),
         suffixIcon: isRequired
-            ? const Padding(
-                padding: EdgeInsets.only(right: 12.0),
-                child: Icon(Icons.star, size: 16, color: Colors.red),
-              )
+            ? const Icon(Icons.star, size: 16, color: Colors.redAccent)
             : null,
-        prefixText: prefix,
-        hintText: hint,
+        filled: true,
+        fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 16,
         ),
-        filled: true,
-        fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
         ),
       ),
       validator:
           validator ??
-          (v) => (isRequired && v!.isEmpty) ? 'This field is required' : null,
+          (v) => (isRequired && (v == null || v.isEmpty)) ? 'Required' : null,
     );
   }
 
@@ -251,22 +318,41 @@ class _AddProductViewState extends State<_AddProductView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Enter the full product description below.",
-          style: TextStyle(color: Colors.grey.shade600),
+          "Rich product description supports bold, lists, links, and more.",
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300, width: 1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: HtmlEditor(
-            controller: controller.htmlController,
-            htmlEditorOptions: const HtmlEditorOptions(
-              hint: "Start typing your product description...",
-              autoAdjustHeight: true,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: HtmlEditor(
+              controller: controller.htmlController,
+              htmlEditorOptions: const HtmlEditorOptions(
+                hint: "Describe your product in detail...",
+                shouldEnsureVisible: true,
+              ),
+              htmlToolbarOptions: const HtmlToolbarOptions(
+                toolbarPosition: ToolbarPosition.aboveEditor,
+                defaultToolbarButtons: [
+                  StyleButtons(),
+                  FontButtons(clearAll: false),
+                  ColorButtons(),
+                  ListButtons(),
+                  ParagraphButtons(),
+                ],
+              ),
+              otherOptions: const OtherOptions(height: 320),
             ),
-            otherOptions: const OtherOptions(height: 300),
           ),
         ),
       ],
@@ -283,37 +369,32 @@ class _AddProductViewState extends State<_AddProductView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Action Buttons ──
+        // Action Buttons
         Wrap(
           spacing: 10,
-          runSpacing: 8,
-          alignment: WrapAlignment.end,
+          runSpacing: 10,
           children: [
-            OutlinedButton.icon(
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Add Parent'),
-              onPressed: () =>
+            _actionChip(
+              label: 'Add Parent',
+              icon: Icons.add_circle_outline,
+              onTap: () =>
                   controller.openAddCategoryDialog(context, parentId: 0),
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.call_split),
-              label: const Text('Add Sub'),
-              onPressed: controller.model.selectedCategoryIds.isEmpty
+            _actionChip(
+              label: 'Add Sub',
+              icon: Icons.call_split,
+              onTap: controller.model.selectedCategoryIds.isEmpty
                   ? null
                   : () => controller.openAddCategoryDialog(
                       context,
                       parentId: controller.model.selectedCategoryIds.first,
                     ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade50,
-                foregroundColor: Colors.indigo.shade700,
-                elevation: 0,
-              ),
+              enabled: controller.model.selectedCategoryIds.isNotEmpty,
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit'),
-              onPressed: canEdit
+            _actionChip(
+              label: 'Edit',
+              icon: Icons.edit_outlined,
+              onTap: canEdit
                   ? () {
                       final sel = controller.model.checkedList.first;
                       controller.openEditCategoryDialog(
@@ -323,55 +404,74 @@ class _AddProductViewState extends State<_AddProductView> {
                       );
                     }
                   : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: canEdit ? Colors.orange.shade50 : null,
-                foregroundColor: canEdit ? Colors.orange.shade700 : null,
-                elevation: 0,
-              ),
+              enabled: canEdit,
+              color: Colors.orange,
             ),
           ],
         ),
         const SizedBox(height: 16),
         Text(
-          "Choose categories for your product. Parent categories are displayed first. Click the expand icon (>) next to a category to view its subcategories.",
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          "Select one or more categories. Use > to expand.",
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 13.5),
         ),
-        const SizedBox(height: 8),
-
-        // ── TREE ──
-        controller.model.loadingCategories
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 50.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            : Container(
-                height: 400, // Fixed height for scrolling
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Padding(
+        const SizedBox(height: 12),
+        Container(
+          height: 400,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade100,
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: controller.model.loadingCategories
+              ? const Center(child: CircularProgressIndicator())
+              : Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: GenerateTree(
                     data: controller.model.treeListData,
-                    onChecked: (TreeNode node, bool isChecked, int commonID) =>
-                        controller.updateCheckedCategories(
-                          node,
-                          isChecked,
-                          commonID,
-                        ),
+                    onChecked: (node, isChecked, commonID) => controller
+                        .updateCheckedCategories(node, isChecked, commonID),
                     selectOneToAll: false,
                   ),
                 ),
-              ),
+        ),
       ],
     );
   }
 
-  // ───────── Images & Camera Support ─────────
+  Widget _actionChip({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onTap,
+    bool enabled = true,
+    Color? color,
+  }) {
+    return FilterChip(
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      avatar: Icon(icon, size: 18),
+      selected: false,
+      onSelected: enabled ? (_) => onTap?.call() : null,
+      backgroundColor: enabled
+          ? (color?.withOpacity(0.1) ?? Colors.indigo.shade50)
+          : Colors.grey.shade200,
+      selectedColor: color?.withOpacity(0.2),
+      labelStyle: TextStyle(
+        color: enabled
+            ? (color ?? Colors.indigo.shade700)
+            : Colors.grey.shade500,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      side: BorderSide.none,
+    );
+  }
+
+  // ───────── Images & Media ─────────
   Widget _buildImagesCard(
     BuildContext context,
     AddProductController controller,
@@ -379,162 +479,225 @@ class _AddProductViewState extends State<_AddProductView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Main Product Image",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 8),
-
-        // ── Main Image ──
-        GestureDetector(
-          onTap: () async {
-            final result = await showModalBottomSheet<String>(
-              context: context,
-              builder: (_) => _buildImageSourceSheet(context),
-            );
-            if (result == 'camera') {
-              await controller.pickMainImage(fromCamera: true);
-            } else if (result == 'gallery') {
-              await controller.pickMainImage(fromCamera: false);
-            }
-          },
-          child: Container(
-            height: 150,
-            width: 250,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: controller.model.mainImageBase64 != null
-                    ? Colors.blue.shade700
-                    : Colors.grey.shade400,
-                width: 2,
-              ),
-            ),
-            child: controller.model.mainImageBase64 != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.memory(
-                      base64Decode(controller.model.mainImageBase64!),
-                      fit: BoxFit.cover,
-                      height: 150,
-                      width: 250,
-                    ),
-                  )
-                : const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.camera_alt_outlined,
-                          size: 40,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 8),
-                        Text("Tap to pick main image"),
-                      ],
-                    ),
-                  ),
+        _sectionTitle("Main Product Image"),
+        const SizedBox(height: 12),
+        Center(
+          child: _imagePickerBox(
+            context: context,
+            imageBase64: controller.model.mainImageBase64,
+            onTap: () => _showImageSourceSheet(context, (source) {
+              if (source == 'camera') {
+                controller.pickMainImage(fromCamera: true);
+              } else {
+                controller.pickMainImage(fromCamera: false);
+              }
+            }),
+            isMain: true,
           ),
         ),
-        const SizedBox(height: 24),
-
-        // ── Sub Images ──
-        const Text(
-          "Additional Gallery Images",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        const SizedBox(height: 28),
+        _sectionTitle("Additional Gallery Images"),
         const SizedBox(height: 12),
-
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 14,
+          runSpacing: 14,
           children: [
-            InkWell(
-              onTap: () async {
-                final result = await showModalBottomSheet<String>(
-                  context: context,
-                  builder: (_) => _buildImageSourceSheet(context),
-                );
-                if (result == 'camera') {
-                  await controller.pickSubImages(fromCamera: true);
-                } else if (result == 'gallery') {
-                  await controller.pickSubImages(fromCamera: false);
+            _addImageButton(
+              context,
+              () => _showImageSourceSheet(context, (source) {
+                if (source == 'camera') {
+                  controller.pickSubImages(fromCamera: true);
+                } else {
+                  controller.pickSubImages(fromCamera: false);
                 }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.add_a_photo_outlined,
-                    size: 30,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
+              }),
             ),
-            ...List.generate(
-              controller.model.subImagesBase64.length,
-              (index) => Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(
-                      base64Decode(controller.model.subImagesBase64[index]),
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: GestureDetector(
-                      onTap: () => controller.removeSubImage(index),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(
-                          Icons.close,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ...controller.model.subImagesBase64.asMap().entries.map((entry) {
+              int index = entry.key;
+              String base64 = entry.value;
+              return _galleryImageThumbnail(
+                base64,
+                () => controller.removeSubImage(index),
+              );
+            }),
           ],
         ),
       ],
     );
   }
 
-  // ───────── Bottom Sheet: Camera or Gallery ─────────
+  Widget _sectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade800,
+      ),
+    );
+  }
+
+  Widget _imagePickerBox({
+    required BuildContext context,
+    required String? imageBase64,
+    required VoidCallback onTap,
+    required bool isMain,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        height: isMain ? 180 : 110,
+        width: isMain ? double.infinity : 110,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: imageBase64 != null
+                ? Colors.blue.shade600
+                : Colors.grey.shade400,
+            width: imageBase64 != null ? 2.5 : 2,
+          ),
+          boxShadow: imageBase64 != null
+              ? [
+                  BoxShadow(
+                    color: Colors.blue.shade100.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: imageBase64 != null
+              ? Image.memory(
+                  base64Decode(imageBase64),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                )
+              : Container(
+                  color: Colors.grey.shade100,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_a_photo_rounded,
+                        size: isMain ? 48 : 32,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isMain ? "Tap to add main image" : "Add",
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _addImageButton(BuildContext context, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey.shade300,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: const Icon(
+          Icons.add_photo_alternate_outlined,
+          size: 36,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  Widget _galleryImageThumbnail(String base64, VoidCallback onRemove) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.memory(
+            base64Decode(base64),
+            width: 100,
+            height: 100,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showImageSourceSheet(
+    BuildContext context,
+    Function(String) onSelected,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _buildImageSourceSheet(context, onSelected),
+    );
+  }
+
   Widget _buildImageSourceSheet(
-    BuildContext context, [
-    AddProductController? controller,
-  ]) {
+    BuildContext context,
+    Function(String) onSelected,
+  ) {
     return SafeArea(
-      child: Wrap(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
           ListTile(
-            leading: const Icon(Icons.camera_alt_outlined),
-            title: const Text('Take Photo'),
+            leading: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+            title: const Text(
+              'Take Photo',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             onTap: () async {
               final status = await Permission.camera.request();
               if (status.isGranted) {
-                Navigator.pop(context, 'camera');
+                Navigator.pop(context);
+                onSelected('camera');
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Camera permission denied')),
@@ -543,17 +706,62 @@ class _AddProductViewState extends State<_AddProductView> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Choose from Gallery'),
-            onTap: () => Navigator.pop(context, 'gallery'),
+            leading: const Icon(
+              Icons.photo_library_rounded,
+              color: Colors.green,
+            ),
+            title: const Text(
+              'Choose from Gallery',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              onSelected('gallery');
+            },
           ),
-          const Divider(height: 0),
+          const Divider(height: 1),
           ListTile(
-            leading: const Icon(Icons.close),
-            title: const Text('Cancel'),
+            leading: const Icon(Icons.close_rounded, color: Colors.red),
+            title: const Text(
+              'Cancel',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             onTap: () => Navigator.pop(context),
           ),
         ],
+      ),
+    );
+  }
+
+  // ───────── Save Button ─────────
+  Widget _buildSaveButton(
+    Color primaryColor,
+    AddProductController controller,
+    BuildContext context,
+  ) {
+    return SizedBox(
+      height: 60,
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.check_circle_rounded, size: 28),
+        label: const Text(
+          "Save Product",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        onPressed: () => controller.saveProduct(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 8,
+          shadowColor: primaryColor.withOpacity(0.4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+        ),
       ),
     );
   }

@@ -1,294 +1,205 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  login_view.dart – Premium Glassmorphic Login (no shimmer)
+// ─────────────────────────────────────────────────────────────────────────────
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../controllers/auth_controller.dart'; // Assumed to exist
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
+import '../controllers/auth_controller.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({Key? key}) : super(key: key);
 
   @override
-  _LoginViewState createState() => _LoginViewState();
+  State<LoginView> createState() => _LoginViewState();
 }
 
 class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
   final AuthController _authController = AuthController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _usernameCtrl = TextEditingController();
+  final TextEditingController _passwordCtrl = TextEditingController();
   final FocusNode _usernameFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
+
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
-  // Configuration Constants
-  static const Color _accentColor = Colors.cyan; // Your new main color
+  // ────── DESIGN CONSTANTS ──────
+  static const Color _accent = Colors.cyan;
   static const String _logoUrl =
-      'https://app.pacific.com.kh/pacific/assets/assets/ico/ped-logo.png'; // <-- 🚨 REPLACE THIS WITH YOUR LOGO'S URL
+      'https://app.pacific.com.kh/pacific/assets/assets/ico/ped-logo.png'; // Replace
 
-  late AnimationController _loadController;
-  late AnimationController _pulseController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late final AnimationController _loadCtrl;
+  late final AnimationController _pulseCtrl;
+  late final AnimationController _waveCtrl;
+
+  late final Animation<double> _fadeAnim;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _waveAnim;
 
   @override
   void initState() {
     super.initState();
     _authController.init();
 
-    // Initial Load Animation (Fade and Scale in)
-    _loadController = AnimationController(
+    // Page load animation
+    _loadCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _loadController,
-      curve: Curves.easeOut,
-    );
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _loadController, curve: Curves.easeOutBack),
-    );
-    _loadController.forward();
+    _fadeAnim = CurvedAnimation(parent: _loadCtrl, curve: Curves.easeOut);
+    _scaleAnim = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _loadCtrl, curve: Curves.easeOutBack));
+    _loadCtrl.forward();
 
-    // Logo Pulse Animation (Subtle continuous effect)
-    _pulseController = AnimationController(
+    // Logo pulse
+    _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+
+    // Background wave
+    _waveCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+    _waveAnim = Tween<double>(begin: 0, end: 1).animate(_waveCtrl);
   }
 
   @override
   void dispose() {
     _authController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _usernameCtrl.dispose();
+    _passwordCtrl.dispose();
     _usernameFocus.dispose();
     _passwordFocus.dispose();
-    _loadController.dispose();
-    _pulseController.dispose();
+    _loadCtrl.dispose();
+    _pulseCtrl.dispose();
+    _waveCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  // ────── LOGIN LOGIC ──────
+  Future<void> _login() async {
     FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
-    if (_isLoading) return;
+    if (!_formKey.currentState!.validate() || _isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final result = await _authController.login(
-        _usernameController.text,
-        _passwordController.text,
+        _usernameCtrl.text.trim(),
+        _passwordCtrl.text,
       );
+
+      if (!mounted) return;
+
       if (result['success']) {
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/dashboard');
-        }
+        Navigator.of(context).pushReplacementNamed('/dashboard');
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Login failed: ${result['message']}'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
+        _showError(result['message'] ?? 'Invalid credentials');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
+      if (mounted) _showError(e.toString());
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(msg, style: GoogleFonts.poppins())),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // --- MODIFICATION 1: Set background to solid color ---
-      backgroundColor: Colors.white, // Set Scaffold background to white
       resizeToAvoidBottomInset: true,
-      body: Container(
-        // Add a subtle top-to-bottom cyan gradient to the body for style
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.cyan.shade200.withOpacity(0.3), // Subtle cyan at the top
-              Colors.cyan.shade50.withOpacity(0.7),  // Lighter cyan in the middle
-              Colors.white.withOpacity(0.9),         // Soft white at the bottom
-            ],
-            stops: const [0.0, 0.5, 1.0], 
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 40.0,
-              ),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: _buildLoginCard(context),
+      body: Stack(
+        children: [
+          // ────── ANIMATED BACKGROUND ──────
+          _AnimatedGradientBackground(waveAnim: _waveAnim),
+
+          // ────── MAIN CONTENT ──────
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 40,
+                ),
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: ScaleTransition(
+                    scale: _scaleAnim,
+                    child: _buildGlassCard(),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  /// Builds the glassmorphism-styled login card.
-  Widget _buildLoginCard(BuildContext context) {
-    const Color accentColor = _accentColor;
-
+  // ────── GLASSMORPHIC CARD ──────
+  Widget _buildGlassCard() {
     return Container(
-      // Outer container styling for shadow and border
+      constraints: const BoxConstraints(maxWidth: 420),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.white.withOpacity(0.7), width: 1.8),
         boxShadow: [
-          // Lighter shadow for a brighter background
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 40,
+            offset: const Offset(0, 20),
           ),
         ],
-        // The card border now contrasts with the white background
-        border: Border.all(color: Colors.white.withOpacity(0.8), width: 1.5),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
         child: BackdropFilter(
-          // Apply blur effect
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            // --- MODIFICATION 2: Adjust opacity to make the 'glass' visible on white ---
-            color: Colors.white.withOpacity(
-              0.4,
-            ), // Higher opacity for visibility on white
-            padding: const EdgeInsets.all(30.0),
-            width: double.infinity,
-            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(32),
+            ),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // --- MODIFICATION 3: Logo Image.network and pulse animation ---
-                  AnimatedBuilder(
-                    animation: _pulseController,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: 1.0 + (_pulseController.value * 0.08),
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: accentColor.withOpacity(0.1),
-                            boxShadow: [
-                              BoxShadow(
-                                color: accentColor.withOpacity(
-                                  0.5 * _pulseController.value,
-                                ),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: Image.network(
-                              _logoUrl,
-                              fit: BoxFit.cover,
-                              // Use a placeholder/error builder for safety
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Center(
-                                      child: CircularProgressIndicator(
-                                        color: accentColor,
-                                      ),
-                                    );
-                                  },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(
-                                  Icons.broken_image,
-                                  size: 40,
-                                  color: Colors.red,
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  // --- Title ---
-                  Text(
-                    'Welcome Back',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: Colors.black87, // Dark text for white background
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sign in to access your account',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.black54, // Lighter dark text
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  // --- Fields ---
-                  _buildTextField(
-                    controller: _usernameController,
-                    focusNode: _usernameFocus,
-                    label: 'Username',
-                    icon: Icons.person_outline,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
+                  _buildLogo(),
                   const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _passwordController,
-                    focusNode: _passwordFocus,
-                    label: 'Password',
-                    icon: Icons.lock_outline,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _handleLogin(),
-                  ),
+                  _buildTitle(),
                   const SizedBox(height: 40),
-                  // --- Login Button ---
-                  _LoginButton(isLoading: _isLoading, onPressed: _handleLogin),
+                  _buildUsernameField(),
+                  const SizedBox(height: 20),
+                  _buildPasswordField(),
+                  const SizedBox(height: 40),
+                  _buildLoginButton(),
                 ],
               ),
             ),
@@ -298,101 +209,56 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
     );
   }
 
-  // Refactored TextField with focus animation, validation, and glassmorphism styling
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required String label,
-    required IconData icon,
-    bool obscureText = false,
-    TextInputType keyboardType = TextInputType.text,
-    TextInputAction textInputAction = TextInputAction.next,
-    Function(String)? onFieldSubmitted,
-  }) {
-    const Color accentColor = _accentColor;
-    // Input fill color is still white with some transparency
-    const Color inputFillColor = Color(0x10FFFFFF);
-
+  // ────── LOGO WITH PULSE ──────
+  Widget _buildLogo() {
     return AnimatedBuilder(
-      animation: focusNode,
+      animation: _pulseCtrl,
       builder: (context, child) {
-        final hasFocus = focusNode.hasFocus;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: hasFocus
-                ? [
-                    BoxShadow(
-                      color: accentColor.withOpacity(0.5),
-                      blurRadius: 15,
-                      spreadRadius: 3,
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(
-                        0.05,
-                      ), // Subtle shadow when not focused
-                      blurRadius: 5,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-          ),
-          child: TextFormField(
-            controller: controller,
-            focusNode: focusNode,
-            obscureText: obscureText,
-            keyboardType: keyboardType,
-            textInputAction: textInputAction,
-            onFieldSubmitted: onFieldSubmitted,
-            // --- MODIFICATION 4: Input text color is dark ---
-            style: const TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your $label.';
-              }
-              return null;
-            },
-            decoration: InputDecoration(
-              labelText: label,
-              // --- MODIFICATION 5: Label and Icon color adjusted for light background ---
-              labelStyle: TextStyle(
-                color: hasFocus ? accentColor : Colors.black54,
+        final pulse = 1.0 + (_pulseCtrl.value * 0.1);
+        final glow = _pulseCtrl.value * 0.6;
+
+        return Transform.scale(
+          scale: pulse,
+          child: Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  _accent.withOpacity(0.3 + glow),
+                  _accent.withOpacity(0.1),
+                ],
               ),
-              prefixIcon: Icon(
-                icon,
-                color: hasFocus ? accentColor : Colors.black54,
-              ),
-              filled: true,
-              fillColor: inputFillColor,
-              // Border styles
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(
-                  color: accentColor, // Cyan border
-                  width: 3.0,
+              boxShadow: [
+                BoxShadow(
+                  color: _accent.withOpacity(0.4 + glow),
+                  blurRadius: 20,
+                  spreadRadius: 4,
                 ),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.red, width: 3),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 18,
-                horizontal: 20,
+              ],
+            ),
+            child: ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: _logoUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  color: Colors.white.withOpacity(0.3),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: _accent,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Icon(
+                    Icons.business,
+                    size: 40,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ),
           ),
@@ -400,56 +266,236 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
       },
     );
   }
+
+  // ────── TITLE ──────
+  Widget _buildTitle() {
+    return Column(
+      children: [
+        Text(
+          'Welcome Back',
+          style: GoogleFonts.poppins(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.black87,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Sign in to continue',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            color: Colors.black54,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ────── USERNAME FIELD ──────
+  Widget _buildUsernameField() {
+    return _AnimatedInput(
+      controller: _usernameCtrl,
+      focusNode: _usernameFocus,
+      label: 'Username or Email',
+      icon: Icons.person_outline_rounded,
+      keyboardType: TextInputType.emailAddress,
+      validator: (v) =>
+          v?.trim().isEmpty == true ? 'Enter your username' : null,
+    );
+  }
+
+  // ────── PASSWORD FIELD ──────
+  Widget _buildPasswordField() {
+    return _AnimatedInput(
+      controller: _passwordCtrl,
+      focusNode: _passwordFocus,
+      label: 'Password',
+      icon: Icons.lock_outline_rounded,
+      obscureText: _obscurePassword,
+      textInputAction: TextInputAction.done,
+      onSubmitted: () => _login(), // Fixed: VoidCallback
+      validator: (v) => v?.isEmpty == true ? 'Enter your password' : null,
+      suffix: IconButton(
+        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        color: _passwordFocus.hasFocus ? _accent : Colors.grey.shade600,
+      ),
+    );
+  }
+
+  // ────── LOGIN BUTTON ──────
+  Widget _buildLoginButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 64,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _login,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _accent,
+          foregroundColor: Colors.white,
+          elevation: 12,
+          shadowColor: _accent.withOpacity(0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+              : Text(
+                  'SIGN IN',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
 }
 
-// --- Separate Login Button Widget ---
-class _LoginButton extends StatelessWidget {
-  final bool isLoading;
-  final VoidCallback onPressed;
+// ────── REUSABLE ANIMATED INPUT ──────
+class _AnimatedInput extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String label;
+  final IconData icon;
+  final bool obscureText;
+  final TextInputType keyboardType;
+  final TextInputAction textInputAction;
+  final String? Function(String?)? validator;
+  final VoidCallback? onSubmitted; // Fixed type
+  final Widget? suffix;
 
-  const _LoginButton({required this.isLoading, required this.onPressed});
+  const _AnimatedInput({
+    required this.controller,
+    required this.focusNode,
+    required this.label,
+    required this.icon,
+    this.obscureText = false,
+    this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.next,
+    this.validator,
+    this.onSubmitted,
+    this.suffix,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const Color accentColor =
-        _LoginViewState._accentColor; // Use the defined accent color
+    final hasFocus = focusNode.hasFocus;
 
-    return ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: accentColor, // Cyan background
-        foregroundColor: Colors.white, // White text/icon for contrast
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 40),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        elevation: 10,
-        shadowColor: accentColor.withOpacity(0.6),
-        minimumSize: const Size(double.infinity, 65),
-      ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        child: isLoading
-            ? const SizedBox(
-                key: ValueKey('loading'),
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  color: Colors.white, // White progress indicator for contrast
-                  strokeWidth: 3.5,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.ease,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: hasFocus
+            ? [
+                BoxShadow(
+                  color: _LoginViewState._accent.withOpacity(0.4),
+                  blurRadius: 20,
+                  spreadRadius: 2,
                 ),
-              )
-            : const Text(
-                'SIGN IN',
-                key: ValueKey('text'),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2.0,
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
       ),
+      child: TextFormField(
+        controller: controller,
+        focusNode: focusNode,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        onFieldSubmitted: (_) => onSubmitted?.call(), // Fixed
+        style: GoogleFonts.poppins(
+          color: Colors.black87,
+          fontWeight: FontWeight.w500,
+        ),
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: hasFocus ? _LoginViewState._accent : Colors.black54,
+            fontWeight: FontWeight.w600,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: hasFocus ? _LoginViewState._accent : Colors.black54,
+          ),
+          suffixIcon: suffix,
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.7),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(color: _LoginViewState._accent, width: 2.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 20,
+            horizontal: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ────── ANIMATED GRADIENT BACKGROUND ──────
+class _AnimatedGradientBackground extends StatelessWidget {
+  final Animation<double> waveAnim;
+
+  const _AnimatedGradientBackground({required this.waveAnim});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: waveAnim,
+      builder: (context, child) {
+        final offset = waveAnim.value * 2 * 3.14159;
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.cyan.shade100.withOpacity(0.3),
+                Colors.cyan.shade50.withOpacity(0.5),
+                Colors.white.withOpacity(0.9),
+              ],
+              stops: [0.0, 0.5 + (0.3 * (offset / 6.28)), 1.0],
+            ),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 1, sigmaY: 1),
+            child: Container(color: Colors.transparent),
+          ),
+        );
+      },
     );
   }
 }

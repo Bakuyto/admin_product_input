@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_flutter_app/views/add_video.dart';
+import 'package:my_flutter_app/views/customer_contact_page.dart';
 import 'package:my_flutter_app/views/product_list.dart';
 import '../views/login_view.dart';
 import '../views/admin_view.dart';
@@ -30,11 +31,7 @@ class AppRoutes {
       editProduct: (context) => const EditProductPage(
         productId: 0,
       ), // Placeholder, will be overridden by onGenerateRoute
-      checkCustomers: (context) => Container(
-        child: const Center(
-          child: Text('Check & Update Customer Contact Page'),
-        ),
-      ),
+      checkCustomers: (context) => const CustomerContactPage(),
       settings: (context) =>
           Container(child: const Center(child: Text('Settings Page'))),
       manageCategories: (context) => const ManageCategoriesView(),

@@ -47,6 +47,8 @@ dependencies:
   generate_tree: ^2.2.3
   http_parser: ^4.1.2
   dio: ^5.9.0
+  video_player: ^2.10.0
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
