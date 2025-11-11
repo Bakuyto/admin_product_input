@@ -1,7 +1,7 @@
 <?php
 /*  get_unresolved_contacts.php  */
 header('Content-Type: application/json');
-require_once 'config.php';   // your DB connection
+require_once 'connection.php';   // your DB connection
 
 /* ---------------------------------------------------------
    1. Get every order that has NOT been contacted yet

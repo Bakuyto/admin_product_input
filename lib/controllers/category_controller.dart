@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_flutter_app/models/pub_var.dart';
 import '../constants/api_constants.dart';
 import '../models/base_model.dart';
 
@@ -7,7 +8,7 @@ class CategoryController {
   Future<BaseModel> addCategory(String name, {int? parentId}) async {
     try {
       final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.addCategory}'),
+        Uri.parse('${apiBase}${ApiConstants.addCategory}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'name': name, 'parent_id': parentId ?? 0}),
       );
@@ -22,7 +23,7 @@ class CategoryController {
   Future<BaseModel> editCategory(int id, String name) async {
     try {
       final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.editCategory}'),
+        Uri.parse('${apiBase}${ApiConstants.editCategory}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': id, 'name': name}),
       );
@@ -37,7 +38,7 @@ class CategoryController {
   Future<BaseModel> deleteCategory(int id) async {
     try {
       final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.deleteCategory}'),
+        Uri.parse('${apiBase}${ApiConstants.deleteCategory}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': id}),
       );
@@ -52,7 +53,7 @@ class CategoryController {
   Future<List<Map<String, dynamic>>> getCategories() async {
     try {
       final response = await http.get(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.getCategories}'),
+        Uri.parse('${apiBase}${ApiConstants.getCategories}'),
       );
 
       if (response.statusCode == 200) {

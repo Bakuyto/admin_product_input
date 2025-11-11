@@ -359,17 +359,15 @@ class _AddProductViewState extends State<_AddProductView>
     );
   }
 
-  // ───────── Categories Card ─────────
   Widget _buildCategoriesCard(
     BuildContext context,
     AddProductController controller,
   ) {
-    final bool canEdit = controller.model.selectedCategoryIds.length == 1;
+    final canEdit = controller.model.selectedCategoryIds.length == 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Action Buttons
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -396,11 +394,16 @@ class _AddProductViewState extends State<_AddProductView>
               icon: Icons.edit_outlined,
               onTap: canEdit
                   ? () {
-                      final sel = controller.model.checkedList.first;
+                      final checked = controller.model.checkedList.first;
+                      final id = checked['id'] as int;
+                      final rawTitle = checked['value'] as String;
+                      final cleanName = rawTitle
+                          .replaceAll(RegExp(r'^[　└─\s]+'), '')
+                          .trim();
                       controller.openEditCategoryDialog(
                         context,
-                        id: sel['id'] as int,
-                        currentName: sel['value'] as String,
+                        id: id,
+                        currentName: cleanName,
                       );
                     }
                   : null,
@@ -410,9 +413,9 @@ class _AddProductViewState extends State<_AddProductView>
           ],
         ),
         const SizedBox(height: 16),
-        Text(
-          "Select one or more categories. Use > to expand.",
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 13.5),
+        const Text(
+          "Tap to select • Use Edit button to rename (long press not supported yet)",
+          style: TextStyle(color: Colors.grey, fontSize: 13.5),
         ),
         const SizedBox(height: 12),
         Container(
@@ -438,6 +441,9 @@ class _AddProductViewState extends State<_AddProductView>
                     onChecked: (node, isChecked, commonID) => controller
                         .updateCheckedCategories(node, isChecked, commonID),
                     selectOneToAll: false,
+                    childrenPadding: const EdgeInsets.only(left: 36),
+                    checkBoxColor: Colors.purple.shade600,
+                    textColor: Colors.grey.shade800,
                   ),
                 ),
         ),

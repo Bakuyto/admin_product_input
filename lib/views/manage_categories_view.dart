@@ -89,79 +89,105 @@ class _ManageCategoriesViewState extends State<ManageCategoriesView> {
     );
   }
 
-  void _openEditCategoryDialog(BuildContext context, int id, String currentName) {
+  void _openEditCategoryDialog(
+    BuildContext context,
+    int id,
+    String currentName,
+  ) {
     final ctrl = TextEditingController(text: currentName);
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Edit Category'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: ctrl.text.trim().isEmpty
-                ? null
-                : () async {
-                    final name = ctrl.text.trim();
-                    Navigator.pop(context);
-                    await _addProductModel.editCategory(id, name);
-                    _loadCategories();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Updated: $name')),
-                      );
-                    }
-                  },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text('Edit Category'),
+              content: TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Name'),
+                onChanged: (_) => setState(() {}), // ✅ Rebuild when typing
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: ctrl.text.trim().isEmpty
+                      ? null
+                      : () async {
+                          final name = ctrl.text.trim();
+                          Navigator.pop(context);
+                          await _addProductModel.editCategory(id, name);
+                          _loadCategories();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Updated: $name')),
+                            );
+                          }
+                        },
+                  child: const Text('Update'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
   void _openAddCategoryDialog(BuildContext context, {int parentId = 0}) {
     final ctrl = TextEditingController();
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(parentId == 0 ? 'Add Main Category' : 'Add Subcategory'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: ctrl.text.trim().isEmpty
-                ? null
-                : () async {
-                    final name = ctrl.text.trim();
-                    Navigator.pop(context);
-                    await _addProductModel.addCategory(name, parentId);
-                    _loadCategories();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Added: $name')),
-                      );
-                    }
-                  },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                parentId == 0 ? 'Add Main Category' : 'Add Subcategory',
+              ),
+              content: TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Name'),
+                onChanged: (_) => setState(() {}), // <--- Force Dialog Rebuild
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: ctrl.text.trim().isEmpty
+                      ? null
+                      : () async {
+                          final name = ctrl.text.trim();
+                          Navigator.pop(context);
+                          await _addProductModel.addCategory(name, parentId);
+                          _loadCategories();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Added: $name')),
+                            );
+                          }
+                        },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -228,7 +254,8 @@ class _ManageCategoriesViewState extends State<ManageCategoriesView> {
                   color: Colors.green.shade400,
                   size: 20,
                 ),
-                onPressed: () => _openAddCategoryDialog(context, parentId: categoryId),
+                onPressed: () =>
+                    _openAddCategoryDialog(context, parentId: categoryId),
                 tooltip: 'Add Subcategory',
               ),
               IconButton(
@@ -237,7 +264,11 @@ class _ManageCategoriesViewState extends State<ManageCategoriesView> {
                   color: Colors.orange.shade400,
                   size: 20,
                 ),
-                onPressed: () => _openEditCategoryDialog(context, categoryId, category['name']),
+                onPressed: () => _openEditCategoryDialog(
+                  context,
+                  categoryId,
+                  category['name'],
+                ),
                 tooltip: 'Edit Category',
               ),
               IconButton(

@@ -1,10 +1,7 @@
 <?php
 header('Content-Type: text/plain'); // For debugging
 
-$host = "192.168.99.252";
-$user = "root";
-$pass = "Admin_Pacific_219";
-$dbname = "smarthome";
+include 'connection.php';
 
 $logFile = '/var/www/html/ard/api/upload_log.txt';
 file_put_contents($logFile, "\n=== NEW REQUEST ===\n", FILE_APPEND);

@@ -64,11 +64,13 @@ class AddProductModel {
   }) {
     final List<TreeNode> out = [];
     for (final c in cats) {
-      final id = int.tryParse(c['id'].toString()) ?? 0;
+      final int id = int.tryParse(c['id'].toString()) ?? 0;
+      final String name = c['name']?.toString() ?? 'Unnamed';
       final subs = c['subcategories'] as List<dynamic>? ?? [];
-      final indent = '  ' * depth;
-      final prefix = depth > 0 ? '- ' : '';
-      final title = '$indent$prefix${c['name'] ?? ''}';
+
+      final indent = depth == 0 ? '' : '　　' * (depth - 1) + '└─ ';
+      final title = '$indent$name';
+
       final node = TreeNode(
         id: id,
         title: title,
@@ -76,9 +78,9 @@ class AddProductModel {
             ? flattenCategories(subs, parentId: id, depth: depth + 1)
             : [],
         checked: false,
-        show: false, // Hide all categories initially, let user expand manually
+        show: false,
         pid: parentId,
-        commonID: 0,
+        commonID: id, // REQUIRED – real DB ID for editing
       );
       out.add(node);
     }

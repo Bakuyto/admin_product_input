@@ -5,7 +5,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
+import 'package:my_flutter_app/models/pub_var.dart' as pub_var;
 import '../controllers/auth_controller.dart';
 
 class LoginView extends StatefulWidget {
@@ -25,6 +25,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = false;
 
   // ────── DESIGN CONSTANTS ──────
   static const Color _accent = Colors.cyan;
@@ -43,6 +44,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _authController.init();
+    _loadSavedCredentials();
 
     // Page load animation
     _loadCtrl = AnimationController(
@@ -70,6 +72,20 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
     _waveAnim = Tween<double>(begin: 0, end: 1).animate(_waveCtrl);
   }
 
+  Future<void> _loadSavedCredentials() async {
+    final savedUsername = await _authController.getSavedUsername();
+    final rememberMe = await _authController.isRememberMeEnabled();
+
+    if (mounted) {
+      setState(() {
+        _rememberMe = rememberMe;
+        if (savedUsername != null) {
+          _usernameCtrl.text = savedUsername;
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _authController.dispose();
@@ -94,11 +110,16 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
       final result = await _authController.login(
         _usernameCtrl.text.trim(),
         _passwordCtrl.text,
+        remember: _rememberMe,
       );
 
       if (!mounted) return;
 
       if (result['success']) {
+        // ✅ SAVE USER ROLE GLOBALLY
+        pub_var.userRole = result['user']['user_role'].toString();
+
+        // ✅ NAVIGATE
         Navigator.of(context).pushReplacementNamed('/dashboard');
       } else {
         _showError(result['message'] ?? 'Invalid credentials');
@@ -198,6 +219,8 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
                   _buildUsernameField(),
                   const SizedBox(height: 20),
                   _buildPasswordField(),
+                  const SizedBox(height: 20),
+                  _buildRememberMeCheckbox(),
                   const SizedBox(height: 40),
                   _buildLoginButton(),
                 ],
@@ -322,6 +345,31 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         color: _passwordFocus.hasFocus ? _accent : Colors.grey.shade600,
       ),
+    );
+  }
+
+  // ────── REMEMBER ME CHECKBOX ──────
+  Widget _buildRememberMeCheckbox() {
+    return Row(
+      children: [
+        Checkbox(
+          value: _rememberMe,
+          onChanged: (value) {
+            setState(() {
+              _rememberMe = value ?? false;
+            });
+          },
+          activeColor: _accent,
+          checkColor: Colors.white,
+        ),
+        Text(
+          'Remember Me',
+          style: GoogleFonts.poppins(
+            color: Colors.black87,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 

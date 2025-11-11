@@ -160,7 +160,7 @@ class AddProductController extends ChangeNotifier {
   }
 
   // ────────────────────────────────────────────────
-  // DIALOGS
+  // DIALOGS – EDIT NOW WORKS FOR SUBCATEGORIES
   // ────────────────────────────────────────────────
   void openAddCategoryDialog(BuildContext context, {int parentId = 0}) {
     final ctrl = TextEditingController();
@@ -172,7 +172,7 @@ class AddProductController extends ChangeNotifier {
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: const InputDecoration(labelText: 'Category Name'),
         ),
         actions: [
           TextButton(
@@ -213,7 +213,7 @@ class AddProductController extends ChangeNotifier {
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: const InputDecoration(labelText: 'Category Name'),
         ),
         actions: [
           TextButton(
@@ -241,7 +241,7 @@ class AddProductController extends ChangeNotifier {
   }
 
   // ────────────────────────────────────────────────
-  // SAVE PRODUCT – FULLY WORKING
+  // SAVE PRODUCT
   // ────────────────────────────────────────────────
   Future<void> saveProduct(BuildContext context) async {
     if (!formKey.currentState!.validate()) {
@@ -265,7 +265,6 @@ class AddProductController extends ChangeNotifier {
       return;
     }
 
-    // ── Build JSON string (exact same structure PHP expects)
     final dataMap = {
       "name": _model.name.trim(),
       "sku": _model.sku.trim(),
@@ -277,16 +276,12 @@ class AddProductController extends ChangeNotifier {
     final jsonString = jsonEncode(dataMap);
     debugPrint('Sending JSON: $jsonString');
 
-    // ── Multipart request
     final request = http.MultipartRequest(
       'POST',
       Uri.parse("${apiBase}add_product.php"),
     );
-
-    // 1. JSON goes in a normal POST field called **data**
     request.fields['data'] = jsonString;
 
-    // 2. Main image
     request.files.add(
       http.MultipartFile.fromBytes(
         'main_image',
@@ -295,7 +290,6 @@ class AddProductController extends ChangeNotifier {
       ),
     );
 
-    // 3. Sub-images (optional)
     for (int i = 0; i < _model.subImageBytes.length; i++) {
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -306,7 +300,6 @@ class AddProductController extends ChangeNotifier {
       );
     }
 
-    // ── Send
     try {
       final streamed = await request.send();
       final resp = await http.Response.fromStream(streamed);
@@ -314,11 +307,15 @@ class AddProductController extends ChangeNotifier {
 
       final jsonResp = jsonDecode(resp.body);
       if (jsonResp['success'] == true) {
-        _showSnack(context, jsonResp['message'] ?? 'Saved!', error: false);
+        _showSnack(
+          context,
+          jsonResp['message'] ?? 'Product saved!',
+          error: false,
+        );
         _resetForm();
         if (Navigator.canPop(context)) Navigator.pop(context, true);
       } else {
-        throw jsonResp['message'] ?? 'Failed';
+        throw jsonResp['message'] ?? 'Failed to save';
       }
     } catch (e) {
       debugPrint('Upload error: $e');

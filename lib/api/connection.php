@@ -1,13 +1,13 @@
 <?php
-// $host = "192.168.99.252";
-// $user = "root";
-// $pass = "Admin_Pacific_219";
-// $dbname = "smarthome";
-
-$host = "192.168.99.197";
+$host = "192.168.99.252";
 $user = "root";
-$pass = "sb1281ch";
-$dbname = "testing";
+$pass = "Admin_Pacific_219";
+$dbname = "smarthome";
+
+// $host = "192.168.99.197";
+// $user = "root";
+// $pass = "sb1281ch";
+// $dbname = "testing";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:my_flutter_app/models/pub_var.dart' as pub_var;
 import '../routes/app_routes.dart';
+import '../controllers/auth_controller.dart';
 
 class AdminView extends StatefulWidget {
   const AdminView({Key? key}) : super(key: key);
@@ -53,15 +54,9 @@ class _AdminViewState extends State<AdminView> {
     });
   }
 
-  // Modern Color Palette
-  static const Color primaryColor = Color(0xFF42A5F5);
-  static const Color secondaryColor = Color(0xFF1E88E5);
-  static const Color scaffoldBackgroundColor = Color(0xFFF5F7FA);
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return WillPopScope(
       onWillPop: () async {
@@ -69,7 +64,6 @@ class _AdminViewState extends State<AdminView> {
         return false;
       },
       child: Scaffold(
-        backgroundColor: scaffoldBackgroundColor,
         appBar: AppBar(
           automaticallyImplyLeading: false,
           title: Text(
@@ -79,9 +73,42 @@ class _AdminViewState extends State<AdminView> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          backgroundColor: primaryColor,
+          backgroundColor: Colors.blue,
           elevation: 4,
-          shadowColor: Colors.black12,
+          actions: [
+            IconButton(
+              icon: Icon(Icons.logout, color: Colors.white),
+              onPressed: () async {
+                // Show confirmation dialog
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (shouldLogout == true) {
+                  // Perform logout
+                  final authController = AuthController();
+                  await authController.logout();
+                  // Navigate to login
+                  Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+                }
+              },
+              tooltip: 'Logout',
+            ),
+          ],
         ),
         body: RefreshIndicator(
           onRefresh: _refreshData,
@@ -128,17 +155,19 @@ class _AdminViewState extends State<AdminView> {
     String title,
     TextTheme textTheme,
   ) {
+    final theme = Theme.of(context);
     return Text(
       title,
       style: textTheme.headlineMedium?.copyWith(
         fontWeight: FontWeight.bold,
-        color: Colors.black87,
+        color: theme.colorScheme.onBackground,
       ),
     );
   }
 
   // === RESPONSIVE QUICK STATS ===
   Widget _buildQuickStats(BuildContext context, BoxConstraints constraints) {
+    final theme = Theme.of(context);
     final width = constraints.maxWidth;
     final crossAxisCount = width <= 500 ? 1 : (width <= 900 ? 2 : 3);
 
@@ -205,7 +234,7 @@ class _AdminViewState extends State<AdminView> {
             );
           },
         ),
-        const Divider(height: 40, thickness: 1.5, color: Colors.black12),
+        Divider(height: 40, thickness: 1.5, color: theme.dividerColor),
       ],
     );
   }
@@ -261,7 +290,11 @@ class _AdminViewState extends State<AdminView> {
       childAspectRatio = 1.35;
     }
 
-    final cards = [
+    // ✅ Get user role
+    final role = pub_var.userRole;
+
+    // ✅ Admin: full access
+    List<Widget> cards = [
       _buildDashboardCard(
         context,
         Icons.add_business_outlined,
@@ -316,25 +349,22 @@ class _AdminViewState extends State<AdminView> {
         const Color(0xFFF3E5F5),
         'Review sales reports and trends.',
       ),
-      _buildDashboardCard(
-        context,
-        Icons.settings_outlined,
-        'App Settings',
-        '/settings',
-        const Color(0xFF795548),
-        const Color(0xFFEFEBE9),
-        'Configure application preferences.',
-      ),
-      _buildDashboardCard(
-        context,
-        Icons.attach_money,
-        'Price Management',
-        '/price_management',
-        const Color(0xFF009688),
-        const Color(0xFFE0F2F1),
-        'Adjust product pricing and promotions.',
-      ),
     ];
+
+    // ✅ User Role = 0 → Show ONLY Quick Stats + Customer Contacts
+    if (role == "0") {
+      cards = [
+        _buildDashboardCard(
+          context,
+          Icons.support_agent_outlined,
+          'Customer Contacts',
+          '/check_customers',
+          const Color(0xFFFF9800),
+          const Color(0xFFFFF3E0),
+          'Check and update customer information.',
+        ),
+      ];
+    }
 
     return GridView.count(
       shrinkWrap: true,

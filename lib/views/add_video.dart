@@ -305,7 +305,7 @@ class _AddNewVideoState extends State<AddNewVideo>
         title: const Text('Add New Video'),
         centerTitle: true,
         elevation: 1,
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.blue,
       ),
       body: Stack(
         children: [
