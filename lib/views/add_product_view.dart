@@ -98,13 +98,13 @@ class _AddProductViewState extends State<_AddProductView>
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.preview_outlined),
-            onPressed: () {
-              // Preview product
-            },
-            tooltip: 'Preview',
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.preview_outlined),
+          //   onPressed: () {
+          //     // Preview product
+          //   },
+          //   tooltip: 'Preview',
+          // ),
         ],
       ),
       body: FadeTransition(

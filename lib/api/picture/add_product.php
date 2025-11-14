@@ -44,7 +44,7 @@ sort($categoryArray, SORT_NUMERIC);
 $category_ids  = $conn->real_escape_string(implode(',', $categoryArray));
 
 // Folder setup
-$uploadDir = "/var/www/html/lyheng/picture/images/";
+$uploadDir = __DIR__ . "/picture/images/";
 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) jsonResponse(false, "Failed to create image folder");
 
 $allowedTypes = ['jpg','jpeg','png','gif'];
@@ -53,7 +53,7 @@ $maxSize = 5 * 1024 * 1024; // 5 MB
 // ── Main image (required)
 if (!isset($_FILES['main_image'])) jsonResponse(false, "Main image is required");
 $mainImage = $_FILES['main_image'];
-$ext = strtolower(pathinfo($mainImage['name'], flags: PATHINFO_EXTENSION));
+$ext = strtolower(pathinfo($mainImage['name'], PATHINFO_EXTENSION));
 if (!in_array($ext, $allowedTypes)) jsonResponse(false, "Main image type not allowed");
 if ($mainImage['size'] > $maxSize) jsonResponse(false, "Main image exceeds 5 MB");
 
@@ -62,7 +62,7 @@ $mainDest = $uploadDir . $mainFileName;
 if (!move_uploaded_file($mainImage['tmp_name'], $mainDest)) jsonResponse(false, "Failed to move main image");
 
 // ── Sub-images (optional)
-$subImagesFilenames = ['images/' . $mainFileName]; // Add the main image to sub-images array
+$subImagesFilenames = [];
 if (!empty($_FILES['sub_images'])) {
     if (is_array($_FILES['sub_images']['error'])) {
         foreach ($_FILES['sub_images']['error'] as $i => $err) {
@@ -93,18 +93,15 @@ if (!empty($_FILES['sub_images'])) {
 // Save filenames to DB
 $imagesJson = $conn->real_escape_string(json_encode($subImagesFilenames));
 
-// Prepend "images/" to the main image filename before inserting into the database
-$mainImagePath = 'images/' . $mainFileName;
-
 $sql = "INSERT INTO products 
         (name, sku, price, stock_quantity, category_ids, description, image_path, images_json)
         VALUES 
-        ('$name', '$sku', $price, $stock_quantity, '$category_ids', '$description', '$mainImagePath', '$imagesJson')";
+        ('$name', '$sku', $price, $stock_quantity, '$category_ids', '$description', '$mainFileName', '$imagesJson')";
 
 if ($conn->query($sql) === TRUE) {
     jsonResponse(true, "Product added successfully.", [
         "product_id" => $conn->insert_id,
-        "main_image" => $mainImagePath, // Include the "images/" prefix in the response
+        "main_image" => $mainFileName,
         "sub_images" => $subImagesFilenames,
         "category_ids" => $categoryArray
     ]);

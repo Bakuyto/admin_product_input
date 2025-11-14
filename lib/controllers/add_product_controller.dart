@@ -164,38 +164,86 @@ class AddProductController extends ChangeNotifier {
   // ────────────────────────────────────────────────
   void openAddCategoryDialog(BuildContext context, {int parentId = 0}) {
     final ctrl = TextEditingController();
+    bool isLoading = false;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(parentId == 0 ? 'Add Main Category' : 'Add Subcategory'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Category Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: ctrl.text.trim().isEmpty
-                ? null
-                : () async {
-                    final name = ctrl.text.trim();
-                    Navigator.pop(context);
-                    await addCategory(name, parentId);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Added: $name')));
-                    }
-                  },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // <-- This rebuilds the dialog
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                parentId == 0 ? 'Add Main Category' : 'Add Subcategory',
+              ),
+              content: TextField(
+                controller: ctrl,
+                autofocus: true,
+                onChanged: (_) =>
+                    setState(() {}), // <-- Trigger rebuild on typing
+                decoration: const InputDecoration(
+                  labelText: 'Category Name',
+                  hintText: 'e.g., Electronics',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: ctrl.text.trim().isEmpty || isLoading
+                      ? null
+                      : () async {
+                          final name = ctrl.text.trim();
+                          setState(() => isLoading = true);
+
+                          try {
+                            await addCategory(name, parentId);
+                            if (!dialogContext.mounted) return;
+
+                            Navigator.pop(dialogContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Added: $name'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          } catch (e) {
+                            if (!dialogContext.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (dialogContext.mounted) {
+                              setState(() => isLoading = false);
+                            }
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -205,38 +253,79 @@ class AddProductController extends ChangeNotifier {
     required String currentName,
   }) {
     final ctrl = TextEditingController(text: currentName);
+    bool isLoading = false;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Edit Category'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Category Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: ctrl.text.trim().isEmpty
-                ? null
-                : () async {
-                    final name = ctrl.text.trim();
-                    Navigator.pop(context);
-                    await editCategory(id, name);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Updated: $name')));
-                    }
-                  },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text('Edit Category'),
+              content: TextField(
+                controller: ctrl,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Category Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: ctrl.text.trim().isEmpty || isLoading
+                      ? null
+                      : () async {
+                          final name = ctrl.text.trim();
+                          setState(() => isLoading = true);
+
+                          try {
+                            await editCategory(id, name);
+                            if (!dialogContext.mounted) return;
+
+                            Navigator.pop(dialogContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Updated: $name'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (dialogContext.mounted)
+                              setState(() => isLoading = false);
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Update'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

@@ -111,7 +111,11 @@ class ProductModel extends ChangeNotifier {
     await loadCategories(); // ← Rebuild tree
   }
 
-  List<TreeNode> _buildTree(List<dynamic> cats, {int parentId = 0, int depth = 0}) {
+  List<TreeNode> _buildTree(
+    List<dynamic> cats, {
+    int parentId = 0,
+    int depth = 0,
+  }) {
     final out = <TreeNode>[];
     for (final c in cats) {
       final id = int.tryParse(c['id'].toString()) ?? 0;
@@ -119,15 +123,20 @@ class ProductModel extends ChangeNotifier {
       final indent = '  ' * depth;
       final prefix = depth > 0 ? '- ' : '';
       final title = '$indent$prefix${c['name'] ?? ''}';
-      out.add(TreeNode(
-        id: id,
-        title: title,
-        children: subs.isNotEmpty ? _buildTree(subs, parentId: id, depth: depth + 1) : [],
-        checked: false,
-        show: false, // Hide all categories initially, let user expand manually
-        pid: parentId,
-        commonID: 0,
-      ));
+      out.add(
+        TreeNode(
+          id: id,
+          title: title,
+          children: subs.isNotEmpty
+              ? _buildTree(subs, parentId: id, depth: depth + 1)
+              : [],
+          checked: false,
+          show:
+              false, // Hide all categories initially, let user expand manually
+          pid: parentId,
+          commonID: 0,
+        ),
+      );
     }
     return out;
   }
@@ -197,7 +206,7 @@ class ProductModel extends ChangeNotifier {
     final request = http.MultipartRequest('POST', uri);
 
     request.fields['data'] = jsonEncode({
-      "id": id,
+      "wc_id": id,
       "name": name,
       "sku": sku,
       "price": price,

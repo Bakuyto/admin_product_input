@@ -174,11 +174,7 @@ class _AdminViewState extends State<AdminView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle(
-          context,
-          'Key Metrics Overview',
-          Theme.of(context).textTheme,
-        ),
+        _buildSectionTitle(context, 'Quick State', Theme.of(context).textTheme),
         const SizedBox(height: 16),
         FutureBuilder<Map<String, dynamic>>(
           future: _dashboardFuture,

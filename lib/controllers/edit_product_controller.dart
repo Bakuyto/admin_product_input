@@ -393,14 +393,15 @@ class EditProductController extends ChangeNotifier {
     model.sku = skuController.text.trim();
     model.price = double.tryParse(priceController.text) ?? 0.0;
     model.stockQuantity = int.tryParse(stockController.text) ?? 0;
-    // model.description is updated by the HtmlEditor callback
 
     final request = http.MultipartRequest(
       'POST',
       Uri.parse("${apiBase}update_product.php"),
     );
-    request.fields['id'] = productId.toString();
+
+    // PUT wc_id INSIDE data JSON
     request.fields['data'] = jsonEncode({
+      "wc_id": productId, // ← THIS IS THE KEY
       "name": model.name,
       "sku": model.sku,
       "price": model.price,
@@ -409,6 +410,7 @@ class EditProductController extends ChangeNotifier {
       "description": model.description,
     });
 
+    // Main image
     if (model.mainImageBytes != null) {
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -418,6 +420,8 @@ class EditProductController extends ChangeNotifier {
         ),
       );
     }
+
+    // Sub images
     for (int i = 0; i < model.subImageBytes.length; i++) {
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -428,19 +432,31 @@ class EditProductController extends ChangeNotifier {
       );
     }
 
-    final streamed = await request.send();
-    final resp = await http.Response.fromStream(streamed);
-    final json = jsonDecode(resp.body);
+    try {
+      final streamed = await request.send();
+      final resp = await http.Response.fromStream(streamed);
+      final json = jsonDecode(resp.body);
 
-    if (json['success']) {
-      ScaffoldMessenger.of(
-        ctx,
-      ).showSnackBar(const SnackBar(content: Text('Updated!')));
-      Navigator.pop(ctx);
-    } else {
-      ScaffoldMessenger.of(
-        ctx,
-      ).showSnackBar(SnackBar(content: Text(json['message'] ?? 'Failed')));
+      if (json['success'] == true) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(
+            content: Text('Product updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(ctx, true);
+      } else {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text(json['message'] ?? 'Update failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -448,7 +464,7 @@ class EditProductController extends ChangeNotifier {
   Future<void> deleteProduct(BuildContext ctx) async {
     final res = await http.post(
       Uri.parse("${apiBase}delete_product.php"),
-      body: {'id': productId.toString()},
+      body: {'wc_id': productId.toString()},
     );
     final json = jsonDecode(res.body);
     if (json['success']) {

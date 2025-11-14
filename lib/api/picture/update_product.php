@@ -18,67 +18,77 @@ set_error_handler(fn($errno, $errstr, $errfile, $errline) => jsonResponse(false,
 
 require_once "connection.php";
 
-// Only POST allowed
+// Only POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonResponse(false, "Only POST allowed");
 
 // Decode JSON metadata
 $json = json_decode($_POST['data'] ?? '', true);
 if (json_last_error() !== JSON_ERROR_NONE) jsonResponse(false, "Invalid JSON in 'data' field");
 
-// Required field: wc_id
-if (!isset($json['wc_id'])) jsonResponse(false, "Missing field: wc_id");
-$wc_id = (int)$json['wc_id'];
-
-// Optional fields
-$name           = isset($json['name']) ? $conn->real_escape_string(trim($json['name'])) : null;
-$sku            = isset($json['sku']) ? $conn->real_escape_string(trim($json['sku'])) : null;
-$price          = isset($json['price']) ? (float)$json['price'] : null;
-$stock_quantity = isset($json['stock_quantity']) ? (int)$json['stock_quantity'] : null;
-$description    = isset($json['description']) ? $conn->real_escape_string($json['description']) : null;
-
-// Optional categories
-$category_ids = null;
-if (isset($json['category_ids']) && is_array($json['category_ids'])) {
-    sort($json['category_ids'], SORT_NUMERIC);
-    $category_ids = $conn->real_escape_string(implode(',', $json['category_ids']));
+// Required fields
+$required = ['id', 'name','price','stock_quantity','category_ids','description'];
+foreach ($required as $f) {
+    if (!isset($json[$f])) jsonResponse(false, "Missing field: $f");
 }
 
+$id = (int)$json['id'];
+if ($id <= 0) jsonResponse(false, "Invalid product ID");
+
+// Sanitize inputs
+$name           = $conn->real_escape_string(trim($json['name']));
+$sku            = $conn->real_escape_string(trim($json['sku'] ?? ''));
+$price          = (float)$json['price'];
+$stock_quantity = (int)$json['stock_quantity'];
+$description    = $conn->real_escape_string($json['description']);
+
+// Handle category IDs properly
+$categoryArray = is_array($json['category_ids']) ? $json['category_ids'] : [];
+sort($categoryArray, SORT_NUMERIC);
+$category_ids  = $conn->real_escape_string(implode(',', $categoryArray));
+
 // Folder setup
-$uploadDir = "/var/www/html/lyheng/picture/images/";
+$uploadDir = __DIR__ . "/picture/images/";
 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) jsonResponse(false, "Failed to create image folder");
 
 $allowedTypes = ['jpg','jpeg','png','gif'];
-$maxSize = 5 * 1024 * 1024; // 5 MB
+$maxSize = 5 * 1024 * 1024; // 5MB
 
-// Fetch existing product
-$result = $conn->query("SELECT image_path, images_json FROM products WHERE wc_id = $wc_id");
-if ($result->num_rows === 0) jsonResponse(false, "Product not found");
-$product = $result->fetch_assoc();
+// Fetch existing product to get current images
+$existing = $conn->query("SELECT image_path, images_json FROM products WHERE wc_id = $id");
+if (!$existing || $existing->num_rows === 0) jsonResponse(false, "Product not found");
+$existingRow = $existing->fetch_assoc();
+$currentMainImage = $existingRow['image_path'];
+$currentSubImages = json_decode($existingRow['images_json'], true) ?? [];
 
-// Existing images
-$mainImagePath = $product['image_path'];
-$subImagesFilenames = json_decode($product['images_json'], true) ?: [];
-
-// ── Update main image (optional)
-if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] === UPLOAD_ERR_OK) {
+// ── Main image (optional, if provided)
+$mainFileName = $currentMainImage;
+if (isset($_FILES['main_image'])) {
     $mainImage = $_FILES['main_image'];
     $ext = strtolower(pathinfo($mainImage['name'], PATHINFO_EXTENSION));
-
     if (!in_array($ext, $allowedTypes)) jsonResponse(false, "Main image type not allowed");
-    if ($mainImage['size'] > $maxSize) jsonResponse(false, "Main image exceeds 5 MB");
+    if ($mainImage['size'] > $maxSize) jsonResponse(false, "Main image exceeds 5MB");
 
     $mainFileName = uniqid('main_') . '.' . $ext;
     $mainDest = $uploadDir . $mainFileName;
     if (!move_uploaded_file($mainImage['tmp_name'], $mainDest)) jsonResponse(false, "Failed to move main image");
 
-    $mainImagePath = 'images/' . $mainFileName;
+    // Delete old main image if exists
+    if (!empty($currentMainImage) && file_exists($uploadDir . $currentMainImage)) {
+        unlink($uploadDir . $currentMainImage);
+    }
 }
 
-// ── Update sub-images (optional)
-$newSubImages = [];
+// ── Sub-images (optional, if provided)
+$subImagesFilenames = $currentSubImages;
 if (!empty($_FILES['sub_images'])) {
+    // Delete old sub images
+    foreach ($currentSubImages as $oldSub) {
+        $oldPath = $uploadDir . $oldSub;
+        if (file_exists($oldPath)) unlink($oldPath);
+    }
+
+    $subImagesFilenames = [];
     if (is_array($_FILES['sub_images']['error'])) {
-        // Multiple files
         foreach ($_FILES['sub_images']['error'] as $i => $err) {
             if ($err === UPLOAD_ERR_OK) {
                 $ext = strtolower(pathinfo($_FILES['sub_images']['name'][$i], PATHINFO_EXTENSION));
@@ -88,54 +98,42 @@ if (!empty($_FILES['sub_images'])) {
                 $fileName = uniqid('sub_') . '.' . $ext;
                 $dest = $uploadDir . $fileName;
                 if (move_uploaded_file($_FILES['sub_images']['tmp_name'][$i], $dest)) {
-                    $newSubImages[] = 'images/' . $fileName;
+                    $subImagesFilenames[] = 'images/' . $fileName;
                 }
             }
         }
     } elseif ($_FILES['sub_images']['error'] === UPLOAD_ERR_OK) {
-        // Single file
         $ext = strtolower(pathinfo($_FILES['sub_images']['name'], PATHINFO_EXTENSION));
         if (in_array($ext, $allowedTypes) && $_FILES['sub_images']['size'] <= $maxSize) {
             $fileName = uniqid('sub_') . '.' . $ext;
             $dest = $uploadDir . $fileName;
             if (move_uploaded_file($_FILES['sub_images']['tmp_name'], $dest)) {
-                $newSubImages[] = 'images/' . $fileName;
+                $subImagesFilenames[] = 'images/' . $fileName;
             }
         }
     }
 }
 
-// Merge sub-images
-if (!empty($newSubImages)) {
-    $subImagesFilenames = $newSubImages;
-}
-if (!isset($subImagesFilenames) || empty($subImagesFilenames)) {
-    $subImagesFilenames = [$mainImagePath];
-} else {
-    $subImagesFilenames[0] = $mainImagePath; // Always sync first image with main
-}
-
+// Save filenames to DB
 $imagesJson = $conn->real_escape_string(json_encode($subImagesFilenames));
 
-// ── Build SQL dynamically
-$updates = [];
-if ($name !== null) $updates[] = "name = '$name'";
-if ($sku !== null) $updates[] = "sku = '$sku'";
-if ($price !== null) $updates[] = "price = $price";
-if ($stock_quantity !== null) $updates[] = "stock_quantity = $stock_quantity";
-if ($category_ids !== null) $updates[] = "category_ids = '$category_ids'";
-if ($description !== null) $updates[] = "description = '$description'";
-$updates[] = "image_path = '$mainImagePath'";
-$updates[] = "images_json = '$imagesJson'";
-
-$sql = "UPDATE products SET " . implode(', ', $updates) . " WHERE wc_id = $wc_id";
+$sql = "UPDATE products SET
+        name = '$name',
+        sku = '$sku',
+        price = $price,
+        stock_quantity = $stock_quantity,
+        category_ids = '$category_ids',
+        description = '$description',
+        image_path = '$mainFileName',
+        images_json = '$imagesJson'
+        WHERE wc_id = $id";
 
 if ($conn->query($sql) === TRUE) {
     jsonResponse(true, "Product updated successfully.", [
-        "wc_id" => $wc_id,
-        "main_image" => $mainImagePath,
+        "product_id" => $id,
+        "main_image" => $mainFileName,
         "sub_images" => $subImagesFilenames,
-        "category_ids" => $json['category_ids'] ?? null
+        "category_ids" => $categoryArray
     ]);
 } else {
     jsonResponse(false, "Database error: " . $conn->error);
